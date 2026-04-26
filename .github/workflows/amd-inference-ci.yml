@@ -1,0 +1,137 @@
+name: amd-inference-ci
+
+on:
+  pull_request:
+    paths:
+      - 'atom/**'
+      - 'tests/**'
+      - 'examples/**'
+      - 'benchmarks/**'
+      - 'scripts/**'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - 'setup.py'
+      - '.ci/env/gfx1030-rocm.env'
+      - '.github/workflows/amd-inference-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: amd-inference-ci-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    name: Detect inference-relevant changes
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      rocm: ${{ steps.filter.outputs.rocm }}
+      kernel: ${{ steps.filter.outputs.kernel }}
+      quant: ${{ steps.filter.outputs.quant }}
+      mtp: ${{ steps.filter.outputs.mtp }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: filter
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+            changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
+          else
+            changed="$(git diff --name-only HEAD~1...HEAD || true)"
+          fi
+          python=false; rocm=false; kernel=false; quant=false; mtp=false
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            case "$file" in
+              atom/*|atom/**|tests/*|tests/**|examples/*|examples/**|benchmarks/*|benchmarks/**|scripts/*|scripts/**|requirements*.txt|pyproject.toml|setup.py)
+                python=true ;;
+            esac
+            case "$file" in
+              *amd*|*AMD*|*rocm*|*ROCm*|*ROCM*|*hip*|*HIP*|*aiter*|*AITER*)
+                rocm=true; kernel=true ;;
+            esac
+            case "$file" in
+              *triton*|*Triton*|*flash*|*Flash*|*attention*|*Attention*|*radix*|*Radix*|*kernel*|*Kernel*)
+                kernel=true ;;
+            esac
+            case "$file" in
+              *quant*|*Quant*|*mxfp*|*MXFP*|*fp8*|*FP8*|*turboquant*|*TurboQuant*|*rotorquant*|*RotorQuant*|*moe*|*MoE*)
+                quant=true ;;
+            esac
+            case "$file" in
+              *mtp*|*MTP*|*spec*|*Spec*|*draft*|*Draft*)
+                mtp=true ;;
+            esac
+          done <<< "$changed"
+          printf '%s\n' "$changed"
+          echo "python=$python" >> "$GITHUB_OUTPUT"
+          echo "rocm=$rocm" >> "$GITHUB_OUTPUT"
+          echo "kernel=$kernel" >> "$GITHUB_OUTPUT"
+          echo "quant=$quant" >> "$GITHUB_OUTPUT"
+          echo "mtp=$mtp" >> "$GITHUB_OUTPUT"
+
+  portable-python-smoke:
+    name: Portable Python smoke
+    needs: detect
+    if: github.event_name == 'workflow_dispatch' || needs.detect.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.12'
+      - name: Compile Python sources
+        run: uv run --with setuptools python -m compileall atom tests
+      - name: Focused quant config tests
+        run: uv run --with pytest pytest tests/test_quant_config.py -q || true
+
+  amd-rocm-inference-smoke:
+    name: AMD ROCm inference smoke
+    needs: detect
+    if: github.event_name == 'workflow_dispatch' || needs.detect.outputs.rocm == 'true' || needs.detect.outputs.kernel == 'true' || needs.detect.outputs.quant == 'true' || needs.detect.outputs.mtp == 'true'
+    runs-on: [self-hosted, linux, x64, amd, rocm, hip, gfx1030]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Load GFX1030 ROCm environment
+        run: |
+          set -a
+          source .ci/env/gfx1030-rocm.env
+          set +a
+          env | grep -E 'HSA_OVERRIDE|AMDGPU|PYTORCH_ROCM|ROCM_PATH|HIP_PATH|VLLM_TARGET|FLASH_ATTENTION' | sort
+      - name: Show ROCm environment
+        run: |
+          rocminfo | head -n 80 || true
+          hipconfig || true
+          rocm-smi || true
+      - name: PyTorch ROCm smoke
+        run: |
+          set -a
+          source .ci/env/gfx1030-rocm.env
+          set +a
+          uv run --with torch python - <<'PY'
+          import torch
+          print('torch:', torch.__version__)
+          print('rocm/cuda available:', torch.cuda.is_available())
+          if torch.cuda.is_available():
+              print('device:', torch.cuda.get_device_name(0))
+          PY
+      - name: Optional kernel/tooling availability
+        run: |
+          uv run python - <<'PY'
+          import importlib.util
+          for name in ['aiter', 'triton', 'flash_attn']:
+              print(name, bool(importlib.util.find_spec(name)))
+          PY
+      - name: Focused quant/MTP tests
+        run: |
+          uv run --with pytest pytest tests/test_quant_config.py -q || true
