@@ -685,7 +685,7 @@ class Mxfp4MoEMethod(FusedMoEMethodBase):
             or self.quant_type == QuantType.per_1x32
         )
         gfx = get_gfx()
-        self.use_triton = gfx.startswith("gfx94") or (
+        self.use_triton = gfx.startswith("gfx94") or gfx.startswith("gfx103") or (
             gfx.startswith("gfx95") and envs.ATOM_USE_TRITON_GEMM
         )
         if self.use_triton:
