@@ -75,17 +75,19 @@ def fused_gdn_gating_kernel(
     dt_bias,
     seq_len,
     NUM_HEADS: tl.constexpr,
+    stride_a_batch,
+    stride_b_batch,
     beta: tl.constexpr,
     threshold: tl.constexpr,
     BLK_HEADS: tl.constexpr,
 ):
     i_b, i_s, i_d = tl.program_id(0), tl.program_id(1), tl.program_id(2)
     head_off = i_d * BLK_HEADS + tl.arange(0, BLK_HEADS)
-    off = i_b * seq_len * NUM_HEADS + i_s * NUM_HEADS + head_off
+    out_off = i_b * seq_len * NUM_HEADS + i_s * NUM_HEADS + head_off
     mask = head_off < NUM_HEADS
     blk_A_log = tl.load(A_log + head_off, mask=mask)
-    blk_a = tl.load(a + off, mask=mask)
-    blk_b = tl.load(b + off, mask=mask)
+    blk_a = tl.load(a + i_b * stride_a_batch + head_off, mask=mask)
+    blk_b = tl.load(b + i_b * stride_b_batch + head_off, mask=mask)
     blk_bias = tl.load(dt_bias + head_off, mask=mask)
     # If the model is loaded in fp16, without the .float() here, A might be -inf
     x = blk_a.to(tl.float32) + blk_bias.to(tl.float32)
@@ -93,11 +95,13 @@ def fused_gdn_gating_kernel(
         beta * x <= threshold, (1 / beta) * tl.log(1 + tl.exp(beta * x)), x
     )
     blk_g = -tl.exp(blk_A_log.to(tl.float32)) * softplus_x
-    tl.store(g + off, blk_g.to(g.dtype.element_ty), mask=mask)
+    tl.store(g + out_off, blk_g.to(g.dtype.element_ty), mask=mask)
     # compute beta_output = sigmoid(b)
     blk_beta_output = tl.sigmoid(blk_b.to(tl.float32))
     tl.store(
-        beta_output + off, blk_beta_output.to(beta_output.dtype.element_ty), mask=mask
+        beta_output + out_off,
+        blk_beta_output.to(beta_output.dtype.element_ty),
+        mask=mask,
     )
 
 
@@ -129,6 +133,8 @@ def fused_gdn_gating(
         dt_bias,
         seq_len,
         num_heads,
+        a.stride(0),
+        b.stride(0),
         beta,
         threshold,
         8,
@@ -206,6 +212,7 @@ class GatedDeltaNet(nn.Module):
 
         if attn_metadata is None:
             # V1 profile run
+            core_attn_out.zero_()
             return core_attn_out
 
         assert isinstance(attn_metadata, dict)
@@ -380,6 +387,7 @@ class GatedDeltaNet(nn.Module):
             )
             core_attn_out[:num_actual_tokens] = core_attn_out_non_spec.squeeze(0)
         elif attn_metadata.num_decodes > 0:
+            o = core_attn_out[: attn_metadata.num_decode_tokens]
             if USE_FLYDSL_GDR:
                 core_attn_out_non_spec = query_non_spec.new_empty(*value_non_spec.shape)
                 query_non_spec = query_non_spec.permute(1, 0, 2, 3)
@@ -393,7 +401,7 @@ class GatedDeltaNet(nn.Module):
                     A_log=self.A_log,
                     indices=non_spec_state_indices_tensor,
                     state=ssm_state,
-                    out=core_attn_out_non_spec,
+                    out=o,
                     use_qk_l2norm=True,
                     need_shuffle_state=False,
                     stream=torch.cuda.current_stream(),
@@ -401,7 +409,6 @@ class GatedDeltaNet(nn.Module):
 
                 last_recurrent_state = None
             else:
-                o = core_attn_out[: attn_metadata.num_decode_tokens]
                 core_attn_out_non_spec, last_recurrent_state = (
                     fused_sigmoid_gating_delta_rule_update(
                         A_log=self.A_log,
@@ -436,5 +443,9 @@ class GatedDeltaNet(nn.Module):
             core_attn_out[:num_actual_tokens] = merged_out.squeeze(0)
         elif spec_sequence_masks is not None:
             core_attn_out[:num_actual_tokens] = core_attn_out_spec.squeeze(0)
+
+        # Zero padding tail for CUDA graph replay safety
+        if num_actual_tokens < core_attn_out.shape[0]:
+            core_attn_out[num_actual_tokens:].zero_()
 
         return core_attn_out
