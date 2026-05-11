@@ -1236,6 +1236,7 @@ def create_mla_attn_metadata_builder_init_method(base_class):
         self.padded_num_attention_heads = max(self.num_attention_heads, _MLA_MIN_HEADS)
         self.block_size = kv_cache_spec.block_size
         self.max_bs = max_num_reqs
+        self.is_sparse = hasattr(hf_config, "index_topk")
 
         # Preparing persistent buffers
         # TODO: we can disambiguate between decode and mixed-prefill decode here
@@ -1270,7 +1271,7 @@ def create_mla_attn_metadata_builder_init_method(base_class):
             self.padded_num_attention_heads,
             torch.bfloat16,
             dtypes.d_dtypes[config.cache_config.cache_dtype],
-            is_sparse=False,  # TODO: support sparse
+            is_sparse=self.is_sparse,
             fast_mode=True,
         )
 
