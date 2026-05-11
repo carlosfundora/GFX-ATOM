@@ -79,6 +79,12 @@ environment_variables: dict[str, Callable[[], Any]] = {
     # Use unified_attention (flash-style) for MHA paged/prefill attention instead
     # of pa_decode_gluon. Set to 1 to enable the unified_attention path.
     "ATOM_USE_UNIFIED_ATTN": lambda: os.getenv("ATOM_USE_UNIFIED_ATTN", "0") == "1",
+    # --- Kernel Backend Selection ---
+    # Backend mode: auto (default), te, or aiter.
+    "ATOM_KERNEL_BACKEND_MODE": lambda: os.getenv("ATOM_KERNEL_BACKEND_MODE", "auto"),
+    # Optional comma-separated op names to explicitly include/exclude for TE.
+    "ATOM_TE_OP_ALLOWLIST": lambda: os.getenv("ATOM_TE_OP_ALLOWLIST", ""),
+    "ATOM_TE_OP_DENYLIST": lambda: os.getenv("ATOM_TE_OP_DENYLIST", ""),
     # --- Plugin Mode ---
     "ATOM_DISABLE_VLLM_PLUGIN": lambda: (
         os.getenv("ATOM_DISABLE_VLLM_PLUGIN", "0").lower() == "1"
