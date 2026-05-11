@@ -582,7 +582,19 @@ class ModelRunner:
             dtype=np.int64,
         )
 
-        model_class = resolve_obj_by_qualname(support_model_arch_dict[hf_config.architectures[0]])  # type: ignore
+        model_arch = hf_config.architectures[0]
+        if model_arch == "Lfm2Model":
+            raise ValueError(
+                "Lfm2Model is a retrieval-only ColBERT checkpoint; use the "
+                "retrieval backend in atom.entrypoints.openai.api_server instead "
+                "of the causal-LM ModelRunner."
+            )
+        if model_arch not in support_model_arch_dict:
+            raise ValueError(
+                f"Unsupported architecture: {model_arch}. "
+                "If this is a retrieval model, route it through the ColBERT backend."
+            )
+        model_class = resolve_obj_by_qualname(support_model_arch_dict[model_arch])  # type: ignore
         # The model construction depends on quant_config,
         # so we must complete the remapping for layers before constructing the model.
         config.quant_config.remap_layer_name(

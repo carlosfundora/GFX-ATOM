@@ -120,6 +120,75 @@ class CompletionRequest(BaseModel):
 
 
 # ============================================================================
+# Retrieval / Embeddings / Rerank Models
+# ============================================================================
+
+
+class EmbeddingRequest(BaseModel):
+    """Request model for embeddings."""
+
+    model_config = {"extra": "ignore"}
+
+    model: Optional[str] = None
+    input: Union[str, List[str]]
+    user: Optional[str] = None
+    encoding_format: Optional[str] = None
+
+
+class EmbeddingObject(BaseModel):
+    """Single embedding record."""
+
+    object: str = "embedding"
+    index: int
+    embedding: List[float]
+
+
+class EmbeddingResponse(BaseModel):
+    """Response model for embeddings."""
+
+    object: str = "list"
+    created: int = Field(default_factory=lambda: int(time.time()))
+    model: str
+    data: List[EmbeddingObject]
+    usage: Dict[str, Any]
+
+
+class RerankRequest(BaseModel):
+    """Request model for reranking."""
+
+    model_config = {"extra": "ignore"}
+
+    model: Optional[str] = None
+    query: str
+    documents: List[str]
+    top_k: Optional[int] = None
+    return_documents: bool = True
+    rid: Optional[Union[str, List[str]]] = None
+    user: Optional[str] = None
+
+
+class RerankResult(BaseModel):
+    """Single rerank result."""
+
+    index: int
+    score: float
+    document: Optional[str] = None
+    meta_info: Optional[Dict[str, Any]] = None
+
+
+class RerankResponse(BaseModel):
+    """Response model for reranking."""
+
+    object: str = "rerank"
+    created: int = Field(default_factory=lambda: int(time.time()))
+    model: str
+    id: Optional[Union[str, List[str]]] = None
+    results: List[RerankResult]
+    usage: Dict[str, Any]
+    tokens_evaluated: int = 0
+
+
+# ============================================================================
 # Response Models
 # ============================================================================
 

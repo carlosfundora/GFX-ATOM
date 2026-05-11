@@ -20,13 +20,15 @@ import time
 import uuid
 from asyncio import AbstractEventLoop
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import uvicorn
-from atom import SamplingParams
-from atom.model_engine.arg_utils import EngineArgs
-from atom.model_engine.llm_engine import _load_tokenizer
 from atom.model_engine.request import RequestOutput
+from atom.sampling_params import SamplingParams
+from atom.model_engine.arg_utils import EngineArgs
+from atom.retrieval import ColbertService, is_colbert_model_spec
+from atom.retrieval.colbert import DEFAULT_MANIFEST_ROOT
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from transformers import AutoTokenizer
@@ -34,8 +36,14 @@ from transformers import AutoTokenizer
 from .protocol import (
     ChatCompletionRequest,
     CompletionRequest,
+    EmbeddingObject,
+    EmbeddingRequest,
+    EmbeddingResponse,
     ModelCard,
     ModelList,
+    RerankRequest,
+    RerankResponse,
+    RerankResult,
 )
 from .serving_chat import (
     build_chat_response,
@@ -64,7 +72,9 @@ DEFAULT_PORT = 8000
 
 engine = None
 tokenizer: Optional[AutoTokenizer] = None
+retrieval_service: Optional[ColbertService] = None
 model_name: str = ""
+allowed_model_names: set[str] = set()
 default_chat_template_kwargs: Dict[str, Any] = {}
 _stream_queues: Dict[str, asyncio.Queue] = {}
 _seq_id_to_request_id: Dict[int, str] = {}
@@ -404,12 +414,39 @@ async def generate_async_fanout(
 
 def validate_model(requested_model: Optional[str]) -> None:
     """Validate that the requested model matches the server's model."""
-    if requested_model is not None and requested_model != model_name:
+    if requested_model is None:
+        return
+    if requested_model != model_name and requested_model not in allowed_model_names:
         raise HTTPException(
             status_code=400,
             detail=f"Requested model '{requested_model}' does not match "
             f"server model '{model_name}'",
         )
+
+
+def _ensure_endpoint_supported(endpoint: str) -> None:
+    if retrieval_service is not None and endpoint not in {"embeddings", "rerank"}:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Model '{model_name}' is a retrieval-only ColBERT model and "
+                f"does not support '{endpoint}'."
+            ),
+        )
+    if retrieval_service is None and endpoint in {"embeddings", "rerank"}:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Model '{model_name}' does not support '{endpoint}'. "
+                "Start ATOM with a ColBERT retrieval model to use these routes."
+            ),
+        )
+
+
+def _normalize_embedding_inputs(input_text: str | list[str]) -> list[str]:
+    if isinstance(input_text, str):
+        return [input_text]
+    return list(input_text)
 
 
 async def setup_streaming_request(
@@ -582,6 +619,7 @@ async def chat_completions(request: ChatCompletionRequest):
     """Handle chat completion requests (OpenAI-compatible)."""
     global engine, tokenizer, model_name
 
+    _ensure_endpoint_supported("chat/completions")
     validate_model(request.model)
 
     try:
@@ -680,6 +718,7 @@ async def completions(request: CompletionRequest):
     """Handle text completion requests (OpenAI-compatible)."""
     global engine, tokenizer, model_name
 
+    _ensure_endpoint_supported("completions")
     validate_model(request.model)
 
     try:
@@ -773,6 +812,98 @@ async def completions(request: CompletionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/v1/embeddings")
+async def embeddings(request: EmbeddingRequest):
+    """Handle embedding requests for ColBERT feature extraction."""
+    global retrieval_service, model_name
+
+    _ensure_endpoint_supported("embeddings")
+    validate_model(request.model)
+
+    if retrieval_service is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No retrieval backend is configured for embeddings",
+        )
+
+    texts = _normalize_embedding_inputs(request.input)
+    if not texts:
+        raise HTTPException(status_code=400, detail="input must not be empty")
+
+    try:
+        embeddings_out, tokens_evaluated = retrieval_service.embed_texts(texts)
+        data = [
+            EmbeddingObject(index=index, embedding=embedding)
+            for index, embedding in enumerate(embeddings_out)
+        ]
+        return EmbeddingResponse(
+            model=model_name,
+            data=data,
+            usage={
+                "prompt_tokens": tokens_evaluated,
+                "total_tokens": tokens_evaluated,
+            },
+        )
+    except ValueError as e:
+        logger.error(f"Validation error in embeddings: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error in embeddings: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/rerank")
+async def rerank(request: RerankRequest):
+    """Handle reranking requests for ColBERT retrieval."""
+    global retrieval_service, model_name
+
+    _ensure_endpoint_supported("rerank")
+    validate_model(request.model)
+
+    if retrieval_service is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No retrieval backend is configured for rerank",
+        )
+
+    if not request.query.strip():
+        raise HTTPException(status_code=400, detail="query must not be empty")
+    if not request.documents:
+        raise HTTPException(status_code=400, detail="documents must not be empty")
+
+    try:
+        results_raw, tokens_evaluated = retrieval_service.rerank(
+            request.query,
+            request.documents,
+            top_n=request.top_k,
+        )
+        results = [
+            RerankResult(
+                index=item["index"],
+                score=item["score"],
+                document=item["document"] if request.return_documents else None,
+                meta_info=None,
+            )
+            for item in results_raw
+        ]
+        return RerankResponse(
+            model=model_name,
+            id=request.rid,
+            results=results,
+            usage={
+                "prompt_tokens": tokens_evaluated,
+                "total_tokens": tokens_evaluated,
+            },
+            tokens_evaluated=tokens_evaluated,
+        )
+    except ValueError as e:
+        logger.error(f"Validation error in rerank: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error in rerank: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/v1/models")
 async def list_models():
     """List available models."""
@@ -824,7 +955,8 @@ async def stop_profile():
 
 def main():
     """Main entry point for the server."""
-    global engine, tokenizer, model_name, default_chat_template_kwargs, _request_logger
+    global engine, tokenizer, retrieval_service, model_name, allowed_model_names
+    global default_chat_template_kwargs, _request_logger
 
     parser = argparse.ArgumentParser(description="ATOM OpenAI API Server")
     EngineArgs.add_cli_args(parser)
@@ -851,6 +983,18 @@ def main():
         default=None,
         help="Path to JSONL file for logging all API requests and responses (debug)",
     )
+    parser.add_argument(
+        "--colbert-manifest-root",
+        type=str,
+        default=str(DEFAULT_MANIFEST_ROOT),
+        help="Root directory containing local model manifests for ColBERT models.",
+    )
+    parser.add_argument(
+        "--colbert-device",
+        type=str,
+        default=None,
+        help="Optional torch device override for ColBERT inference (default: cpu).",
+    )
     args = parser.parse_args()
 
     if args.request_log:
@@ -866,19 +1010,40 @@ def main():
         default_chat_template_kwargs = json.loads(args.default_chat_template_kwargs)
         logger.info(f"Default chat template kwargs: {default_chat_template_kwargs}")
 
-    logger.info(f"Loading tokenizer from {args.model}...")
-    tokenizer = _load_tokenizer(args.model, args.trust_remote_code)
-    model_name = args.model
+    colbert_manifest_root = Path(args.colbert_manifest_root)
+    if is_colbert_model_spec(args.model, manifest_root=colbert_manifest_root):
+        logger.info(f"Initializing ColBERT retrieval backend with model {args.model}...")
+        retrieval_service = ColbertService.from_model(
+            args.model,
+            manifest_root=colbert_manifest_root,
+            device=args.colbert_device or "cpu",
+        )
+        model_name = retrieval_service.model_id
+        allowed_model_names = {
+            args.model,
+            model_name,
+            str(retrieval_service.descriptor.weights_path),
+        }
+        tokenizer = None
+        engine = None
+    else:
+        from atom.model_engine.llm_engine import _load_tokenizer
 
-    logger.info(f"Initializing engine with model {args.model}...")
-    engine_args = EngineArgs.from_cli_args(args)
-    engine = engine_args.create_engine(tokenizer=tokenizer)
+        logger.info(f"Loading tokenizer from {args.model}...")
+        tokenizer = _load_tokenizer(args.model, args.trust_remote_code)
+        model_name = args.model
+        allowed_model_names = {model_name}
+
+        logger.info(f"Initializing engine with model {args.model}...")
+        engine_args = EngineArgs.from_cli_args(args)
+        engine = engine_args.create_engine(tokenizer=tokenizer)
 
     import signal
 
     def _sigint_handler(signum, frame):
         logger.info("Received SIGINT, shutting down engine...")
-        engine.close()
+        if engine is not None:
+            engine.close()
         import psutil
 
         try:

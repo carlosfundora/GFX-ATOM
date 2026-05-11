@@ -6,8 +6,8 @@ import logging
 from dataclasses import dataclass, fields
 from typing import List, Optional
 
-from atom import LLMEngine
 from atom.config import CompilationConfig, SpeculativeConfig
+from atom.model_engine.llm_engine import LLMEngine
 
 logger = logging.getLogger("atom")
 
