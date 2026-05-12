@@ -1168,10 +1168,9 @@ class Indexer(nn.Module):
         self.quant_block_size = getattr(config, "quant_block_size", 128)
         self.topk_indices_buffer = topk_indices_buffer
 
-        # TODO (zyongye) change dim to fp8 later to (self.head_dim + 4)
         self.k_cache = DeepseekV32IndexerCache(
             head_dim=self.head_dim + 4,
-            dtype=torch.uint8,
+            dtype=torch.float8_e4m3fn,
             prefix=f"{prefix}.k_cache",
             cache_config=cache_config,
         )
