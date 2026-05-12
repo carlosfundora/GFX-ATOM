@@ -500,21 +500,21 @@ def sparse_attn_indexer_plugin_mode(
         # we only have [num_block, block_size, head_dim],
         kv_cache = kv_cache.unsqueeze(-2)
         decode_lens = decode_metadata.decode_lens
-        if decode_metadata.requires_padding:
-            # pad in edge case where we have short chunked prefill length <
-            # decode_threshold since we unstrictly split
-            # prefill and decode by decode_threshold
-            # (currently set to 1 + speculative tokens)
-            from vllm.v1.attention.ops.common import pack_seq_triton
+        from atom.model_ops.triton_mla_sparse_prep import (
+            triton_pack_q_and_weights,
+            triton_unpack_topk,
+        )
 
-            padded_q_fp8_decode_tokens = pack_seq_triton(
-                q_fp8[:num_decode_tokens], decode_lens
+        if decode_metadata.requires_padding:
+            padded_q_fp8_decode_tokens, padded_weights = triton_pack_q_and_weights(
+                q_fp8[:num_decode_tokens], weights[:num_decode_tokens], decode_lens
             )
         else:
             padded_q_fp8_decode_tokens = q_fp8[:num_decode_tokens].reshape(
                 decode_lens.shape[0], -1, *q_fp8.shape[1:]
             )
-        # TODO: move and optimize below logic with triton kernels
+            padded_weights = weights[:num_decode_tokens]
+
         batch_size = padded_q_fp8_decode_tokens.shape[0]
         next_n = padded_q_fp8_decode_tokens.shape[1]
         assert batch_size == decode_metadata.seq_lens.shape[0]
@@ -525,7 +525,7 @@ def sparse_attn_indexer_plugin_mode(
         deepgemm_fp8_paged_mqa_logits(
             padded_q_fp8_decode_tokens,
             kv_cache,
-            weights[:num_padded_tokens],
+            padded_weights,
             logits,
             decode_metadata.seq_lens,
             decode_metadata.block_table,
@@ -548,9 +548,7 @@ def sparse_attn_indexer_plugin_mode(
         if decode_metadata.requires_padding:
             # if padded, we need to unpack
             # the topk indices removing padded tokens
-            from vllm.v1.attention.ops.common import unpack_seq_triton
-
-            topk_indices = unpack_seq_triton(
+            topk_indices = triton_unpack_topk(
                 topk_indices.reshape(batch_size, -1, topk_indices.shape[-1]),
                 decode_lens,
             )

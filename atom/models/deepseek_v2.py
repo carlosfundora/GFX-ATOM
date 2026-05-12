@@ -1047,7 +1047,6 @@ def sparse_attn_indexer(
         padded_q_fp8_decode_tokens = q_fp8[:num_decode_tokens].reshape(
             context.batch_size, -1, *q_fp8.shape[1:]
         )
-        # TODO: move and optimize below logic with triton kernels
         batch_size = padded_q_fp8_decode_tokens.shape[0]
         next_n = padded_q_fp8_decode_tokens.shape[1]
         assert batch_size == context.batch_size
