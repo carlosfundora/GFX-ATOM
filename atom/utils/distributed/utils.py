@@ -80,10 +80,11 @@ def stateless_init_torch_distributed_process_group(
     A replacement for `torch.distributed.init_process_group` that does not
     pollute the global state. The created ProcessGroup object can be used for
     some operations such as `allreduce`, because it does not depend on the
-    global rank. However, some operations such as `broadcast` cannot be used
-    because it depends on the global rank.
-
-    # TODO: ask for help from PyTorch team if we need the `broadcast` operation.
+    global rank. However, for operations such as `broadcast`, PyTorch's
+    `dist.broadcast` may fail because it depends on the global rank. Instead,
+    you can use the process group's underlying method directly, such as
+    `pg.broadcast([tensor], opts)` where `opts = dist.BroadcastOptions()`
+    and `opts.rootRank` is set to the source rank within the group.
 
     This function is useful when we are not sure about the total number of
     processes in the process group. For example, we may have process
