@@ -129,6 +129,30 @@ environment_variables: dict[str, Callable[[], Any]] = {
     # legacy). Empty means: respect ATOM_V4_BACKEND for all layers. Used for
     # layer-by-layer bisect during migration. Example: "0,3,15,30".
     "ATOM_V4_BACKEND_LAYERS": lambda: os.getenv("ATOM_V4_BACKEND_LAYERS", ""),
+    # --- RDNA2 Kernel Routing ---
+    # Force-enable/disable Wave32-optimized HIP kernels for gfx1030.
+    # "auto" (default) probes hardware; "1"/"true" force-enables; "0"/"false" disables.
+    "ATOM_RDNA2_KERNELS": lambda: os.getenv("ATOM_RDNA2_KERNELS", "auto"),
+    # --- GGUF / 1-Bit Model Support ---
+    # Enable GGUF weight loading (Q1_0, Q4_0, Q8_0, etc.).
+    "ATOM_ENABLE_GGUF": lambda: os.getenv("ATOM_ENABLE_GGUF", "1") == "1",
+    # Override torch dtype for model weights (e.g. "float16", "bfloat16").
+    "ATOM_FORCE_TORCH_DTYPE": lambda: os.getenv("ATOM_FORCE_TORCH_DTYPE", ""),
+    # Force native attention instead of flash-attention (needed for some RDNA2 paths).
+    "ATOM_FORCE_NATIVE_ATTENTION": lambda: (
+        os.getenv("ATOM_FORCE_NATIVE_ATTENTION", "0") == "1"
+    ),
+    # --- KV Cache Compression (RotorQuant / TurboQuant) ---
+    # Enable RotorQuant geometric rotation + quantization for KV cache.
+    "ATOM_KV_QUANT_METHOD": lambda: os.getenv("ATOM_KV_QUANT_METHOD", "none"),
+    # RotorQuant bit width (1, 2, 4, 8). Default 4.
+    "ATOM_KV_QUANT_BITS": lambda: int(os.getenv("ATOM_KV_QUANT_BITS", "4")),
+    # RotorQuant group size for quantization. Default 128.
+    "ATOM_KV_QUANT_GROUP_SIZE": lambda: int(
+        os.getenv("ATOM_KV_QUANT_GROUP_SIZE", "128")
+    ),
+    # TurboQuant rotation type: "givens" (2D pairs) or "quaternion" (4D blocks).
+    "ATOM_KV_ROTATION_TYPE": lambda: os.getenv("ATOM_KV_ROTATION_TYPE", "givens"),
     # --- Debug Dump (atom/utils/debug_helper/) ---
     # All disabled (empty / no-op) by default. Set to enable instrumentation
     # for forward / weight / sampler bisecting; safe to leave wired in
