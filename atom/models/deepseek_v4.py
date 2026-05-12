@@ -67,6 +67,10 @@ from atom.model_ops.moe import FusedMoE
 from atom.model_ops.topK import is_rocm_aiter_fusion_shared_expert_enabled
 from aiter import rope_rotate_activation
 from atom.model_ops.quant_v4 import act_quant_inplace
+from atom.model_ops.attention_mla import (
+    dynamic_per_batched_tensor_quant,
+    _aiter_triton_fp8_bmm,
+)
 from atom.model_ops.sparse_attn_v4 import (
     hc_split_sinkhorn,
 )
@@ -1412,31 +1416,26 @@ class DeepseekV4Attention(nn.Module):
         bf16 = _dequant_fp8_block_to_bf16(
             w.data, scale.data.to(torch.float32), block=128
         )
-        # Replace the weight tensor with BF16, drop the scale param so future
-        # loads / introspection don't try to use a stale FP8 scale.
-        self.wo_a.weight = atom_parameter(bf16)
+
+        # Reshape to [n_local_groups, o_lora_rank, d_per_group]
+        bf16_reshaped = bf16.view(self.n_local_groups, self.o_lora_rank, -1)
+
+        # Requant via dynamic_per_batched_tensor_quant → FP8 + scalar scale
+        w_fp8, w_scale = dynamic_per_batched_tensor_quant(
+            bf16_reshaped, dtype=torch.float8_e4m3fn
+        )
+
+        # Replace the weight tensor with the new FP8 tensor and scale
+        self.wo_a.weight = atom_parameter(w_fp8)
+        self.wo_a_scale = atom_parameter(w_scale)
         try:
             delattr(self.wo_a, "weight_scale")
         except AttributeError:
             pass
+
         # CRITICAL: prevent LinearBase.process_weights_after_loading from
-        # `shuffle_weights(self.weight)` on the now-BF16 wo_a. That shuffle
-        # is for the FP8 CK GEMM layout; applying it to a plain BF16 matrix
-        # consumed by `torch.einsum` corrupts the layout (rows get permuted
-        # within 16×16 blocks, only rows aligned to the block boundaries
-        # stay in place). Iteration order in load_model is parent-first
-        # (DeepseekV4Attention before its child wo_a Linear), so our hook
-        # runs BEFORE the shuffle — overriding `quant_type` here makes the
-        # subsequent LinearBase post-load a no-op for wo_a.
-        #
-        # TODO(perf): replace dequant-to-BF16 + einsum with FP8 batched BMM
-        # (same path as MLA's `_v_up_proj_and_o_proj`). Steps:
-        #   1. Dequant FP8 per-128-block → BF16 (this code)
-        #   2. Reshape to [n_local_groups, o_lora_rank, d_per_group]
-        #   3. Requant via dynamic_per_batched_tensor_quant → FP8 + scalar scale
-        #   4. Forward: _aiter_triton_fp8_bmm(o, W_OA, W_OA_scale, group_size=128)
-        # This avoids the dequant + einsum overhead and reuses the proven MLA
-        # batched-FP8 kernel. See attention_mla.py:211 for reference.
+        # `shuffle_weights(self.weight)` on the now-FP8 wo_a. That shuffle
+        # is for the FP8 CK GEMM layout.
         self.wo_a.quant_type = QuantType.No
 
     def _launch_compressors_async(self, x, plan, state_slot_mapping, block_tables):
@@ -1665,10 +1664,14 @@ class DeepseekV4Attention(nn.Module):
         # contribution carried in by the value-side RoPE of the KV entries.
         self.rotary_emb.inverse(positions, o[..., -rd:])
         # ----- Grouped output LoRA (batched on the full flat tensor) -----
-        o = o.view(num_tokens, self.n_local_groups, -1)
-        wo_a = self.wo_a.weight.view(self.n_local_groups, self.o_lora_rank, -1)
-        o = torch.einsum("sgd,grd->sgr", o, wo_a)
-        x = self.wo_b(o.flatten(1))
+        # Convert o from [num_tokens, n_local_groups, d_per_group] to [n_local_groups, num_tokens, d_per_group]
+        o = o.view(num_tokens, self.n_local_groups, -1).transpose(0, 1)
+        # FP8 batched BMM: [n_local_groups, num_tokens, d_per_group] @ [n_local_groups, o_lora_rank, d_per_group].T
+        # returns [num_tokens, n_local_groups, o_lora_rank]
+        o = _aiter_triton_fp8_bmm(
+            o, self.wo_a.weight, self.wo_a_scale, group_size=128, transpose_bm=True
+        )
+        x = self.wo_b(o.flatten(1, 2))
         return x
 
     def _fill_csa_paged_compress(
