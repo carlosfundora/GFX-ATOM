@@ -27,6 +27,15 @@ ATOM resolves the HuggingFace `architectures` field from a model's `config.json`
 
 **Retrieval-only models:** `Lfm2Model`-based ColBERT checkpoints are not loaded through `ModelRunner`. They are routed through the dedicated `atom.retrieval.colbert.ColbertService`, which powers `/v1/embeddings` and `/v1/rerank` using the local registry metadata plus the CPU HF model files.
 
+### Kernel backend selector (phase 1)
+
+Model ops can be routed through the kernel backend selector via environment variables in `atom.utils.envs`:
+
+- `ATOM_KERNEL_BACKEND_MODE=auto|aiter|te` (default `auto`)
+- `ATOM_TE_OP_ALLOWLIST` / `ATOM_TE_OP_DENYLIST` (CSV operation filters)
+
+Current selector-wired ops are `rmsnorm`, `linear`, and `attention_mha`. In this phase, model-op execution remains AITER-only and fails loudly in forced `te` mode when an operation path is not yet implemented.
+
 ---
 
 ## 1. Supported Model Architectures

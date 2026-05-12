@@ -36,6 +36,7 @@ class LayerQuantConfig:
     quant_dtype: Any = torch.bfloat16  # torch.dtype (use Any for forward compat)
     is_dynamic: bool = True
     quant_method: str | None = None
+    quant_format: str | None = None
 
     @property
     def is_quantized(self) -> bool:
@@ -148,7 +149,9 @@ def _parse_is_dynamic(input_tensors: dict | None) -> bool:
     return input_tensors.get("is_dynamic", True)
 
 
-def _build_quark_layer_spec(layer_dict: dict) -> LayerQuantConfig:
+def _build_quark_layer_spec(
+    layer_dict: dict, quant_format: str | None = None
+) -> LayerQuantConfig:
     """Build a :class:`LayerQuantConfig` from a single Quark per-layer dict."""
     weight = layer_dict.get("weight", {}) or {}
     return LayerQuantConfig(
@@ -156,6 +159,7 @@ def _build_quark_layer_spec(layer_dict: dict) -> LayerQuantConfig:
         quant_dtype=_parse_quant_dtype(weight.get("dtype")),
         is_dynamic=_parse_is_dynamic(layer_dict.get("input_tensors")),
         quant_method="quark",
+        quant_format=quant_format,
     )
 
 
@@ -170,14 +174,17 @@ class QuarkParser(QuantConfigParser):
         global_dict = hf_quant_config.get("global_quant_config") or {}
         layer_dict = hf_quant_config.get("layer_quant_config") or {}
         exclude = list(hf_quant_config.get("exclude") or [])
+        quant_format = hf_quant_config.get("format")
 
         global_spec = (
-            _build_quark_layer_spec(global_dict) if global_dict else LayerQuantConfig()
+            _build_quark_layer_spec(global_dict, quant_format)
+            if global_dict
+            else LayerQuantConfig()
         )
 
         pattern_specs: list[tuple[str, LayerQuantConfig]] = []
         for pattern, cfg in layer_dict.items():
-            pattern_specs.append((pattern, _build_quark_layer_spec(cfg)))
+            pattern_specs.append((pattern, _build_quark_layer_spec(cfg, quant_format)))
 
         return ParsedQuantConfig(
             global_spec=global_spec,
@@ -210,6 +217,7 @@ class GenericParser(QuantConfigParser):
 
     def parse(self, hf_quant_config: dict) -> ParsedQuantConfig:
         quant_method = hf_quant_config.get("quant_method", "")
+        quant_format = hf_quant_config.get("format")
         config_str = str(hf_quant_config).lower()
 
         quant_dtype = self._infer_dtype(hf_quant_config, config_str)
@@ -238,6 +246,7 @@ class GenericParser(QuantConfigParser):
             quant_dtype=quant_dtype,
             is_dynamic=is_dynamic,
             quant_method=quant_method or None,
+            quant_format=quant_format,
         )
 
         return ParsedQuantConfig(global_spec=global_spec, exclude_layers=exclude)

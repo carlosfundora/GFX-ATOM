@@ -18,6 +18,7 @@ from aiter.jit.utils.torch_guard import torch_compile_guard
 from aiter.ops.gated_rmsnorm_fp8_group_quant import gated_rmsnorm_fp8_group_quant
 from aiter.ops.triton.fused_add_rmsnorm_pad import fused_add_rmsnorm_pad
 from atom.config import QuantizationConfig
+from atom.kernel_backend import select_kernel_backend
 from atom.model_ops.utils import atom_parameter
 from atom.quant_spec import LayerQuantConfig
 from atom.utils.decorators import mark_trace
@@ -278,6 +279,14 @@ class RMSNorm(nn.Module):
             )
             return x, residual
         else:
+            backend, reason = select_kernel_backend(
+                op_name="rmsnorm",
+                te_supported=False,
+            )
+            if backend != "aiter":
+                raise RuntimeError(
+                    f"Unsupported backend '{backend}' for rmsnorm: {reason}"
+                )
             if x_scale is not None and self.use_fused_quant:
                 import aiter as rocm_aiter
                 from aiter.ops.triton.fused_fp8_quant import (

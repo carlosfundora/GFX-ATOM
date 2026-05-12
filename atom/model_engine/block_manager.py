@@ -60,11 +60,15 @@ class BlockManager:
 
     @classmethod
     def compute_hash(cls, token_ids: list[int], prefix: int = -1):
-        h = xxhash.xxh64()
-        if prefix != -1:
-            h.update(prefix.to_bytes(8, "little"))
-        h.update(np.array(token_ids).tobytes())
-        return h.intdigest()
+        try:
+            import atom_rust
+            return atom_rust.compute_hash(token_ids, prefix)
+        except ImportError:
+            h = xxhash.xxh64()
+            if prefix != -1:
+                h.update(prefix.to_bytes(8, "little"))
+            h.update(np.array(token_ids).tobytes())
+            return h.intdigest()
 
     def _pop_free_block(self) -> int:
         """Pop the next available free block id from the FIFO queue (lazy cleanup)."""

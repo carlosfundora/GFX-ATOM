@@ -55,6 +55,17 @@ from atom.utils.custom_register import direct_register_custom_op
 from atom.utils.forward_context import get_forward_context
 from atom.utils.decorators import mark_trace
 from torch import nn
+
+_ASM_MOE_A16_QUANT_TYPES = {QuantType.per_Token, QuantType.per_1x128}
+_ASM_MOE_A16_DTYPES = {torch.float16, torch.bfloat16}
+_ASM_MOE_A16_W1_DTYPES = {torch.int8, torch.uint8, torch.float8_e4m3fnuz}
+_BLOCK_QUANT_TYPES = {QuantType.per_1x128, QuantType.per_1x32}
+_W13_DTYPES = {
+    torch.int8,
+    torch.uint8,
+    torch.float8_e4m3fnuz,
+    torch.float8_e4m3fn,
+}
 from transformers import PretrainedConfig
 from atom.plugin.moe import FusedMoEDecoratorForPluginMode
 
@@ -586,9 +597,9 @@ def rocm_asm_moe_impl(
     fc2_smooth_scale_fixed = a2_scale
 
     a16_mode = (
-        quant_type_ in [QuantType.per_Token, QuantType.per_1x128]
-        and hidden_states.dtype in [torch.float16, torch.bfloat16]
-        and w1.dtype in [torch.int8, torch.uint8, torch.float8_e4m3fnuz]
+        quant_type_ in _ASM_MOE_A16_QUANT_TYPES
+        and hidden_states.dtype in _ASM_MOE_A16_DTYPES
+        and w1.dtype in _ASM_MOE_A16_W1_DTYPES
         and fc1_smooth_scale_fixed is not None
         and fc2_smooth_scale_fixed is not None
     )
@@ -1109,10 +1120,7 @@ class CompressedTensorsFp8MoEMethod(FusedMoEMethodBase):
         )
 
         # Determine if this is block quantization
-        self.block_quant = self.quant_type in [
-            QuantType.per_1x128,
-            QuantType.per_1x32,
-        ]
+        self.block_quant = self.quant_type in _BLOCK_QUANT_TYPES
 
         # For compressed-tensors, check if per-channel quantization
         self.per_channel = self.quant_type == QuantType.per_Token
@@ -1364,16 +1372,7 @@ class CompressedTensorsFp8MoEMethod(FusedMoEMethodBase):
         skip_shuffle_for_block = (
             self.block_quant and not envs.ATOM_FP8_BLOCKSCALE_WEIGHT_PRESHUFFLE
         )
-        if (
-            w13.dtype
-            in [
-                torch.int8,
-                torch.uint8,
-                torch.float8_e4m3fnuz,
-                torch.float8_e4m3fn,
-            ]
-            and not skip_shuffle_for_block
-        ):
+        if w13.dtype in _W13_DTYPES and not skip_shuffle_for_block:
             from aiter.ops.shuffle import shuffle_weight
 
             w13.data = shuffle_weight(w13.data)
@@ -2465,11 +2464,14 @@ class FusedMoE(torch.nn.Module):
             return
 
         # compressed-tensors checkpoints with packed weights are stored flipped
-        # TODO (mgoin): check self.quant_method.quant_config.quant_format
-        # against known CompressionFormat enum values that have this quality
-        if self.quant_method.__class__.__name__ in (
-            "CompressedTensorsWNA16MarlinMoEMethod",
-            "CompressedTensorsWNA16MoEMethod",
+        quant_format = getattr(self.quant_method.quant_config, "quant_format", None)
+        if (
+            quant_format in ("marlin-24", "pack-quantized")
+            or self.quant_method.__class__.__name__
+            in (
+                "CompressedTensorsWNA16MarlinMoEMethod",
+                "CompressedTensorsWNA16MoEMethod",
+            )
         ):
             loaded_weight = loaded_weight.t().contiguous()
 
@@ -2543,10 +2545,7 @@ class FusedMoE(torch.nn.Module):
                     expert_data=expert_data,
                     tp_rank=self.tp_rank,
                 )
-            elif quant_method in [
-                QuantType.per_1x128,
-                QuantType.per_1x32,
-            ]:
+            elif quant_method in _BLOCK_QUANT_TYPES:
                 self._load_model_weight_or_group_weight_scale(
                     shard_id=shard_id,
                     shard_dim=shard_dim,
@@ -2824,7 +2823,10 @@ class FusedMoE(torch.nn.Module):
             (
                 (
                     "experts.w13_"
-                    if weight_name in [ckpt_gate_proj_name, ckpt_up_proj_name]
+                    if (
+                        weight_name == ckpt_gate_proj_name
+                        or weight_name == ckpt_up_proj_name
+                    )
                     else "experts.w2_"
                 ),
                 f"experts.{expert_id}.{weight_name}.",
@@ -2832,11 +2834,11 @@ class FusedMoE(torch.nn.Module):
                 shard_id,
             )
             for expert_id in range(num_experts)
-            for shard_id, weight_name in [
+            for shard_id, weight_name in (
                 ("w1", ckpt_gate_proj_name),
                 ("w2", ckpt_down_proj_name),
                 ("w3", ckpt_up_proj_name),
-            ]
+            )
         ]
 
     def extra_repr(self) -> str:

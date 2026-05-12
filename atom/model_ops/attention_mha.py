@@ -10,6 +10,7 @@ from aiter.ops.triton.fused_kv_cache import fused_qk_rope_reshape_and_cache
 from aiter.ops.triton.gluon.pa_decode_gluon import get_recommended_splits
 from aiter.ops.triton.unified_attention import unified_attention
 from atom.config import get_current_atom_config
+from atom.kernel_backend import select_kernel_backend
 from atom.utils.forward_context import ForwardContext, get_forward_context
 from torch import nn
 
@@ -654,6 +655,14 @@ class PagedAttentionImpl(nn.Module):
         output: torch.Tensor = None,
         **kwargs,
     ):
+        backend, reason = select_kernel_backend(
+            op_name="attention_mha",
+            te_supported=False,
+        )
+        if backend != "aiter":
+            raise RuntimeError(
+                f"Unsupported backend '{backend}' for attention_mha: {reason}"
+            )
         if is_plugin_mode():
             # forward impl method are added by the decorator
             # PagedAttentionImplDecoratorForPluginMode

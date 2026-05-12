@@ -26,6 +26,9 @@ _ATOM_ENV_VARS = [
     "ATOM_DISABLE_VLLM_PLUGIN_ATTENTION",
     "ATOM_USE_CUSTOM_ALL_GATHER",
     "ATOM_ENABLE_RELAXED_MTP",
+    "ATOM_KERNEL_BACKEND_MODE",
+    "ATOM_TE_OP_ALLOWLIST",
+    "ATOM_TE_OP_DENYLIST",
 ]
 
 
@@ -88,6 +91,15 @@ class TestEnvsDefaults:
     def test_atom_enable_relaxed_mtp_default(self):
         assert _get_envs().ATOM_ENABLE_RELAXED_MTP is False
 
+    def test_kernel_backend_mode_default(self):
+        assert _get_envs().ATOM_KERNEL_BACKEND_MODE == "auto"
+
+    def test_te_allowlist_default(self):
+        assert _get_envs().ATOM_TE_OP_ALLOWLIST == ""
+
+    def test_te_denylist_default(self):
+        assert _get_envs().ATOM_TE_OP_DENYLIST == ""
+
     def test_unknown_attr_raises(self):
         with pytest.raises(AttributeError):
             _ = _get_envs().ATOM_NONEXISTENT_VAR
@@ -139,6 +151,10 @@ class TestEnvsOverrides:
     def test_atom_enable_relaxed_mtp_enabled(self, monkeypatch):
         monkeypatch.setenv("ATOM_ENABLE_RELAXED_MTP", "1")
         assert _get_envs().ATOM_ENABLE_RELAXED_MTP is True
+
+    def test_kernel_backend_mode_override(self, monkeypatch):
+        monkeypatch.setenv("ATOM_KERNEL_BACKEND_MODE", "te")
+        assert _get_envs().ATOM_KERNEL_BACKEND_MODE == "te"
 
 
 class TestIsSet:

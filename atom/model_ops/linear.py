@@ -23,6 +23,7 @@ from aiter.jit.utils.torch_guard import torch_compile_guard
 from aiter.tuned_gemm import tgemm
 from aiter.utility import fp4_utils
 from atom.config import QuantizationConfig, get_current_atom_config
+from atom.kernel_backend import select_kernel_backend
 from atom.quant_spec import LayerQuantConfig
 from atom.model_ops.utils import (
     atom_parameter,
@@ -407,6 +408,12 @@ class LinearBase(nn.Module):
     def forward(
         self, x: torch.Tensor, x_scale: Optional[torch.Tensor] = None, otype=dtypes.bf16
     ) -> torch.Tensor:
+        backend, reason = select_kernel_backend(
+            op_name="linear",
+            te_supported=False,
+        )
+        if backend != "aiter":
+            raise RuntimeError(f"Unsupported backend '{backend}' for linear: {reason}")
         if self.quant_type.value == QuantType.No.value:
             y = tgemm.mm(
                 x,

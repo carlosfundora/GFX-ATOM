@@ -1,0 +1,11 @@
+{
+  "candidate": "atom/model_engine/block_manager.py",
+  "implementation": "before",
+  "command": "python benchmark_block_manager_hash.py",
+  "timestamp": "2026-05-10T20:35:32.403850",
+  "iterations": 100000,
+  "input_description": "list of 1024 ints, prefix 12345",
+  "duration_ms": 5988.09251199998,
+  "throughput": "16699.81 hashes/s",
+  "notes": "Testing compute_hash functionality which is a CPU hotspot during prefix caching."
+}

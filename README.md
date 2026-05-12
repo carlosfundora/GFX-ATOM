@@ -103,6 +103,20 @@ git clone https://github.com/ROCm/ATOM.git && pip install ./ATOM
 
 ## 💡 Usage
 
+### Kernel backend mode (AITER/TE routing)
+
+ATOM now routes selected kernel families through a backend selector with explicit mode controls:
+
+- `ATOM_KERNEL_BACKEND_MODE=auto|aiter|te` (default: `auto`)
+- `ATOM_TE_OP_ALLOWLIST=<csv>` optional operation allowlist for TE routing
+- `ATOM_TE_OP_DENYLIST=<csv>` optional operation denylist for TE routing
+
+Current phase behavior:
+
+- `rmsnorm`, `linear`, and `attention_mha` are selector-wired.
+- This thin slice remains fail-loud for non-AITER execution paths in model ops until TE execution paths are fully implemented.
+- In forced `te` mode, unsupported operations raise explicit runtime errors instead of silently falling back.
+
 ### Basic Example
 
 Before running the example, please install ninja and the Hugging Face CLI, and log in to your account.
