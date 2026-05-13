@@ -201,15 +201,12 @@ class ChatterboxEngine:
         
         # 5. Apply AGC and Soft Compression (CPU via Rust)
         t4 = time.time()
-        try:
-            import rs_codec
-            # target_rms=-18dBFS ~ 0.125. 
-            # Apply soft compression first to tame peaks
-            wav, _ = rs_codec.soft_compressor(wav, 0.5, 4.0, 0.01, 0.1, 1.0)
-            # Apply AGC to level out everything to -18dBFS
-            wav, _ = rs_codec.agc_kernel(wav, 0.125, 0.01, 0.1, 10.0, 2400, 1.0)
-        except ImportError:
-            logger.debug("rs_codec not available; skipping audio post-processing.")
+        # import rs_codec
+        # target_rms=-18dBFS ~ 0.125. 
+        # Apply soft compression first to tame peaks
+        # wav, _ = rs_codec.soft_compressor(wav, 0.5, 4.0, 0.01, 0.1, 1.0)
+        # Apply AGC to level out everything to -18dBFS
+        # wav, _ = rs_codec.agc_kernel(wav, 0.125, 0.01, 0.1, 10.0, 2400, 1.0)
         metrics["postprocess_sec"] = time.time() - t4
 
         metrics["audio_duration"] = len(wav) / SAMPLE_RATE
@@ -260,9 +257,19 @@ class ChatterboxEngine:
             logits = rep_penalty(generate_tokens, logits)
 
             # Sample or argmax
-            if temperature > 0 and temperature != 1.0:
+            if temperature == 0.0:
+                next_token = torch.argmax(logits, dim=-1, keepdim=True)
+            else:
                 logits = logits / temperature
-            next_token = torch.argmax(logits, dim=-1, keepdim=True)
+                # Apply top-k filtering
+                top_k = 50
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = -float('Inf')
+                
+                import torch.nn.functional as F
+                probs = F.softmax(logits, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1)
+                
             generate_tokens = torch.cat([generate_tokens, next_token], dim=-1)
 
             if (next_token.flatten() == STOP_SPEECH_TOKEN).all():

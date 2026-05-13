@@ -82,13 +82,11 @@ def audio_to_bytes(
     buf = io.BytesIO()
     if response_format == "pcm":
         # Raw 16-bit PCM (Optimized via Rust)
-        try:
-            import rs_codec
-            pcm_bytes = rs_codec.audio_to_pcm_bytes(audio)
-            buf.write(pcm_bytes)
-        except ImportError:
-            pcm_data = (audio * 32767).clip(-32768, 32767).astype(np.int16)
-            buf.write(pcm_data.tobytes())
+        # import rs_codec
+        # pcm_bytes = rs_codec.audio_to_pcm_bytes(audio)
+        # buf.write(pcm_bytes)
+        pcm_data = (audio * 32767).clip(-32768, 32767).astype(np.int16)
+        buf.write(pcm_data.tobytes())
     else:
         sf.write(buf, audio, sample_rate, format=sf_format, **kwargs)
 
