@@ -7,9 +7,6 @@ It replaces `vllm.triton_utils`, `vllm.utils.torch_utils`,
 """
 
 import logging
-import math
-import os
-import functools
 from typing import Any, Callable
 
 import torch
