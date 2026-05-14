@@ -54,3 +54,4 @@ aiter_logs
 *.log
 .claude/plan/
 .worktrees/
+rs_codec/rs_codec/target/

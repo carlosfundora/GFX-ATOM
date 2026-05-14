@@ -199,12 +199,15 @@ class ChatterboxEngine:
         
         # 5. Apply AGC and Soft Compression (CPU via Rust)
         t4 = time.time()
-        # import rs_codec
-        # target_rms=-18dBFS ~ 0.125. 
-        # Apply soft compression first to tame peaks
-        # wav, _ = rs_codec.soft_compressor(wav, 0.5, 4.0, 0.01, 0.1, 1.0)
-        # Apply AGC to level out everything to -18dBFS
-        # wav, _ = rs_codec.agc_kernel(wav, 0.125, 0.01, 0.1, 10.0, 2400, 1.0)
+        try:
+            import rs_codec
+            # target_rms=-18dBFS ~ 0.125.
+            # Apply soft compression first to tame peaks
+            wav, _ = rs_codec.soft_compressor(wav, 0.5, 4.0, 0.01, 0.1, 1.0)
+            # Apply AGC to level out everything to -18dBFS
+            wav, _ = rs_codec.agc_kernel(wav, 0.125, 0.01, 0.1, 10.0, 2400, 1.0)
+        except ImportError:
+            pass # Fallback if rs_codec not installed
         metrics["postprocess_sec"] = time.time() - t4
 
         metrics["audio_duration"] = len(wav) / SAMPLE_RATE
