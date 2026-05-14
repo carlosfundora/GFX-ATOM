@@ -17,14 +17,15 @@ from typing import Optional
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 
+from atom.audio.chatterbox.onnx_artifacts import resolve_component_path
 from atom.audio.chatterbox.service import (
     SAMPLE_RATE,
     START_SPEECH_TOKEN,
     STOP_SPEECH_TOKEN,
     ChatterboxService,
 )
+from atom.audio.runtime import create_cpu_inference_session
 
 logger = logging.getLogger("atom.audio.chatterbox")
 
@@ -59,7 +60,7 @@ class ChatterboxEngine:
         onnx_variant: str = "fp16",
         device: str = "cuda:0",
         dtype: str = "float16",
-        num_threads: int = 4,
+        num_threads: Optional[int] = None,
     ):
         """
         Args:
@@ -67,7 +68,7 @@ class ChatterboxEngine:
             backbone_dir: Path to HF backbone model for GPU loading. If None,
                           uses the ONNX language model on CPU instead.
             variant: "standard" (Llama backbone) or "turbo" (GPT2 backbone).
-            onnx_variant: ONNX precision variant (fp16, fp32, q4f16).
+        onnx_variant: ONNX precision variant (fp16, fp32, q4f16, q8).
             device: GPU device string.
             dtype: Model dtype (float16, bfloat16, float32).
         """
@@ -128,19 +129,16 @@ class ChatterboxEngine:
 
     def _load_onnx_lm(self) -> None:
         """Fallback: load ONNX language model on CPU."""
-        import onnxruntime
-
-        onnx_variant = self.service.onnx_variant
-        lm_name = f"language_model_{onnx_variant}" if onnx_variant != "fp32" else "language_model"
-        lm_path = self.service.onnx_dir / f"{lm_name}.onnx"
-
-        opts = onnxruntime.SessionOptions()
-        opts.inter_op_num_threads = self.service.num_threads
-        opts.intra_op_num_threads = self.service.num_threads
+        lm_path = resolve_component_path(
+            self.service.onnx_dir,
+            "language_model",
+            self.service.onnx_variant,
+        )
 
         logger.info("Loading ONNX language model (CPU fallback): %s", lm_path)
-        self._model = onnxruntime.InferenceSession(
-            str(lm_path), opts, providers=["CPUExecutionProvider"]
+        self._model = create_cpu_inference_session(
+            str(lm_path),
+            num_threads=self.service.num_threads,
         )
         self._use_gpu_backbone = False
 
@@ -169,7 +167,7 @@ class ChatterboxEngine:
 
         # 1. Encode reference voice (CPU)
         t0 = time.time()
-        ref_data = self.service.encode_reference(
+        ref_data = self.service.get_reference_data(
             audio_path=ref_audio_path,
             audio_array=ref_audio_array,
         )
@@ -188,7 +186,7 @@ class ChatterboxEngine:
             )
         else:
             speech_tokens = self._generate_onnx_cpu(
-                prep, ref_data, max_tokens, repetition_penalty,
+                prep, ref_data, max_tokens, repetition_penalty, exaggeration,
             )
         metrics["generate_sec"] = time.time() - t2
         metrics["num_tokens"] = speech_tokens.shape[1]
@@ -288,6 +286,7 @@ class ChatterboxEngine:
         ref_data: dict,
         max_tokens: int,
         repetition_penalty: float,
+        exaggeration: float,
     ) -> np.ndarray:
         """Autoregressive generation on CPU using ONNX Runtime (fallback)."""
         import onnxruntime
@@ -326,7 +325,10 @@ class ChatterboxEngine:
                 seq_len = cur_embeds.shape[1]
                 attention_mask = np.ones((batch_size, seq_len), dtype=np.int64)
             else:
-                cur_embeds = self.service.embed_single_token(next_token)
+                cur_embeds = self.service.embed_single_token(
+                    next_token,
+                    exaggeration=exaggeration,
+                )
                 attention_mask = np.concatenate(
                     [attention_mask, np.ones((batch_size, 1), dtype=np.int64)], axis=1
                 )

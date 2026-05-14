@@ -1,0 +1,59 @@
+# ─────────────────────────────────────────────────────────────
+# Chatterbox Turbo — CPU Execution Profile
+# Validated on FRACTAL (Ryzen 9 3900X / AMD RX 6700 XT / ROCm 7.2)
+# ─────────────────────────────────────────────────────────────
+# Last Updated: 2026-05-13
+
+model:
+  name: "Chatterbox-Turbo-ONNX"
+  hub_id: "ResembleAI/chatterbox-turbo-ONNX"
+  variant: "turbo"
+  backbone_arch: "GPT2LMHeadModel"
+  parameters_m: 350
+  num_hidden_layers: 24
+  num_heads: 16
+  head_dim: 64               # n_embd=1024 / n_head=16
+  vocab_size: 6563
+  sample_rate: 24000
+
+paths:
+  model_dir: "/home/local/Projects/models/huggingface/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf"
+  default_voice_fallback: "/home/local/Projects/models/huggingface/models--onnx-community--chatterbox-ONNX/snapshots/3cab09af388d3f02bba43443fce88c1f4525ac43/default_voice.wav"
+
+runtime:
+  device: "cpu"
+  dtype: "float16"
+  onnx_variant: "fp16"
+  intra_op_threads: 12         # Physical cores (Ryzen 9 3900X)
+  inter_op_threads: 1          # Single-task mode
+  graph_optimization_level: "ORT_ENABLE_ALL"
+
+generation:
+  max_tokens: 512
+  repetition_penalty: 1.2
+  temperature: 0.0             # CPU path uses greedy argmax
+  exaggeration: 0.5
+  cfg_weight: 0                # Disable CFG for batch_size=1
+  seed: null
+
+audio:
+  response_format: "wav"
+  bits_per_sample: 16
+  chunk_size: 256              # Lower chunk size for reduced memory on CPU
+
+dsp:
+  enable_agc: false
+  enable_soft_compressor: false
+
+notes: |
+  CPU-only Turbo configuration. Uses GPT2-based backbone (24 layers, 350M params).
+  
+  ONNX RT Tuning (same as Standard CPU):
+  - inter_op=1, intra_op=12, ORT_ENABLE_ALL
+  
+  Key differences from Standard:
+  - GPT2 architecture (not Llama) — no exaggeration parameter in embed_tokens
+  - Smaller vocab (6563 vs 8194), fewer layers (24 vs 30)
+  - 1-step distilled decoder: faster vocoder at slightly lower quality
+  
+  Turbo does not ship default_voice.wav — uses Standard model's voice as fallback.

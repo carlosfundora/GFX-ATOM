@@ -17,6 +17,9 @@ from typing import Optional
 import numpy as np
 import soundfile as sf
 
+from atom.audio.chatterbox.onnx_artifacts import resolve_component_path
+from atom.audio.runtime import create_cpu_inference_session, physical_core_count
+
 logger = logging.getLogger("atom.audio.chatterbox")
 
 SAMPLE_RATE = 24000
@@ -37,19 +40,20 @@ class ChatterboxService:
         model_dir: str,
         variant: str = "standard",
         onnx_variant: str = "fp16",
-        num_threads: int = 4,
+        num_threads: Optional[int] = None,
     ):
         self.model_dir = Path(model_dir)
         self.variant = variant  # "standard" or "turbo"
         self.onnx_variant = onnx_variant
         self.onnx_dir = self.model_dir / "onnx"
-        self.num_threads = num_threads
+        self.num_threads = num_threads or physical_core_count()
 
         self._speech_encoder = None
         self._embed_tokens = None
         self._cond_decoder = None
         self._tokenizer = None
         self._default_voice = None
+        self._default_ref_data: Optional[dict] = None
 
         # Architecture params (set during load)
         self.num_hidden_layers: int = 0
@@ -59,34 +63,27 @@ class ChatterboxService:
 
     def load(self) -> None:
         """Load all ONNX sessions and tokenizer."""
-        import onnxruntime
         from transformers import AutoTokenizer
 
         t0 = time.time()
-        opts = onnxruntime.SessionOptions()
-        opts.inter_op_num_threads = self.num_threads
-        opts.intra_op_num_threads = self.num_threads
 
         logger.info("Loading Chatterbox %s ONNX components from %s", self.variant, self.model_dir)
 
-        self._speech_encoder = onnxruntime.InferenceSession(
-            str(self.onnx_dir / "speech_encoder.onnx"), opts,
-            providers=["CPUExecutionProvider"],
+        self._speech_encoder = create_cpu_inference_session(
+            str(resolve_component_path(self.onnx_dir, "speech_encoder", self.onnx_variant)),
+            num_threads=self.num_threads,
         )
-        self._embed_tokens = onnxruntime.InferenceSession(
-            str(self.onnx_dir / "embed_tokens.onnx"), opts,
-            providers=["CPUExecutionProvider"],
+        self._embed_tokens = create_cpu_inference_session(
+            str(resolve_component_path(self.onnx_dir, "embed_tokens", self.onnx_variant)),
+            num_threads=self.num_threads,
         )
 
-        lm_name = f"language_model_{self.onnx_variant}" if self.onnx_variant != "fp32" else "language_model"
-        lm_path = self.onnx_dir / f"{lm_name}.onnx"
-        if not lm_path.exists():
-            # Turbo may only have fp16
-            lm_path = self.onnx_dir / "language_model_fp16.onnx"
+        lm_path = resolve_component_path(self.onnx_dir, "language_model", self.onnx_variant)
         # We don't load the ONNX LM — ATOM handles that on GPU.
         # But we inspect it briefly to determine architecture params.
-        lm_session = onnxruntime.InferenceSession(
-            str(lm_path), opts, providers=["CPUExecutionProvider"],
+        lm_session = create_cpu_inference_session(
+            str(lm_path),
+            num_threads=self.num_threads,
         )
         kv_inputs = [i for i in lm_session.get_inputs() if "past_key_values" in i.name]
         self.num_hidden_layers = len(kv_inputs) // 2
@@ -97,9 +94,9 @@ class ChatterboxService:
             self.head_dim = shape[3] if isinstance(shape[3], int) else 64
         del lm_session  # Free ONNX LM — ATOM runs this on GPU
 
-        self._cond_decoder = onnxruntime.InferenceSession(
-            str(self.onnx_dir / "conditional_decoder.onnx"), opts,
-            providers=["CPUExecutionProvider"],
+        self._cond_decoder = create_cpu_inference_session(
+            str(resolve_component_path(self.onnx_dir, "conditional_decoder", self.onnx_variant)),
+            num_threads=self.num_threads,
         )
 
         self._tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir))
@@ -117,6 +114,7 @@ class ChatterboxService:
             # Turbo doesn't ship default_voice.wav — check parent dirs
             for candidate in [
                 self.model_dir.parent.parent / "default_voice.wav",
+                Path("/home/local/ai/models/huggingface/models--onnx-community--chatterbox-ONNX") / "snapshots",
                 Path("/home/local/Projects/models/huggingface/models--onnx-community--chatterbox-ONNX") / "snapshots",
             ]:
                 if candidate.exists():
@@ -184,6 +182,23 @@ class ChatterboxService:
             "prompt_feat": prompt_feat,
         }
 
+    def get_reference_data(
+        self,
+        audio_path: Optional[str] = None,
+        audio_array: Optional[np.ndarray] = None,
+    ) -> dict:
+        """Return reference conditioning, caching the loaded default voice."""
+        if audio_path is not None or audio_array is not None:
+            return self.encode_reference(audio_path=audio_path, audio_array=audio_array)
+
+        if self._default_ref_data is None:
+            self._default_ref_data = self.encode_reference()
+        return self._default_ref_data
+
+    def clear_reference_cache(self) -> None:
+        """Drop cached default reference conditioning."""
+        self._default_ref_data = None
+
     def prepare_inputs(
         self,
         text: str,
@@ -222,14 +237,19 @@ class ChatterboxService:
             "seq_len": full_embeds.shape[1],
         }
 
-    def embed_single_token(self, token_id: np.ndarray) -> np.ndarray:
+    def embed_single_token(
+        self,
+        token_id: np.ndarray,
+        *,
+        exaggeration: float = 0.5,
+    ) -> np.ndarray:
         """Embed a single token for autoregressive generation steps."""
         embed_input_names = [i.name for i in self._embed_tokens.get_inputs()]
         ort_inputs = {"input_ids": token_id}
         if "position_ids" in embed_input_names:
             ort_inputs["position_ids"] = np.zeros_like(token_id)
         if "exaggeration" in embed_input_names:
-            ort_inputs["exaggeration"] = np.array([0.5], dtype=np.float32)
+            ort_inputs["exaggeration"] = np.array([exaggeration], dtype=np.float32)
         return self._embed_tokens.run(None, ort_inputs)[0]
 
     def decode_speech(

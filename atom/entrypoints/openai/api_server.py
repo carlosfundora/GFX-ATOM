@@ -86,6 +86,7 @@ engine = None
 tokenizer: Optional[AutoTokenizer] = None
 retrieval_service: Optional[ColbertService] = None
 speech_serving = None  # SpeechServing instance (if TTS enabled)
+lfm25_audio_client = None  # LFM2.5-Audio client for STT / speech-to-speech
 model_name: str = ""
 allowed_model_names: set[str] = set()
 embedding_mode: bool = False
@@ -962,15 +963,54 @@ async def health():
 # Speech API (OpenAI /v1/audio/speech compatible)
 # ============================================================================
 
-_TTS_NOT_ENABLED = "Speech API not enabled. Start with --tts-model, --fish-speech-model, or --voxcpm2-model."
+_TTS_NOT_ENABLED = (
+    "Speech API not enabled. Start with --tts-model, --fish-speech-model, "
+    "--voxcpm2-model, or --lfm25-audio."
+)
 
 
 @app.post("/v1/audio/speech")
 async def create_speech(request: AudioSpeechRequest):
-    """Generate speech audio from text. Supports Chatterbox, Fish Speech, VoxCPM2."""
+    """Generate speech audio from text."""
     if speech_serving is None:
         raise HTTPException(status_code=404, detail=_TTS_NOT_ENABLED)
     return await speech_serving.create_speech(request)
+
+
+@app.post("/v1/audio/transcriptions")
+async def create_audio_transcription(
+    file: UploadFile,
+    model: str | None = None,
+    language: str = "auto",
+    response_format: str = "json",
+):
+    """Transcribe audio through the optional LFM2.5-Audio bridge."""
+    if lfm25_audio_client is None:
+        raise HTTPException(status_code=404, detail="LFM2.5-Audio STT is not enabled. Start with --lfm25-audio.")
+    wav_bytes = await file.read()
+    try:
+        text = await asyncio.to_thread(
+            lfm25_audio_client.transcribe_wav_bytes,
+            wav_bytes,
+            language=language,
+        )
+    except Exception as exc:
+        logger.error("LFM2.5-Audio transcription failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {exc}")
+    if response_format == "text":
+        return StreamingResponse(iter([text]), media_type="text/plain")
+    return {"text": text, "model": model or "lfm2.5-audio"}
+
+
+@app.post("/v1/audio/transcribe")
+async def create_audio_transcribe_alias(
+    file: UploadFile,
+    model: str | None = None,
+    language: str = "auto",
+    response_format: str = "json",
+):
+    """DEMERZEL-compatible alias for `/v1/audio/transcriptions`."""
+    return await create_audio_transcription(file, model, language, response_format)
 
 
 @app.post("/v1/audio/speech/batch")
@@ -1186,6 +1226,65 @@ def main():
         help="Model dtype for TTS backbone.",
     )
     parser.add_argument(
+        "--tts-onnx-variant",
+        choices=["fp32", "fp16", "q4", "q4f16", "q8"],
+        default="fp16",
+        help="ONNX component precision for Chatterbox CPU sessions.",
+    )
+    parser.add_argument(
+        "--tts-onnx-threads",
+        type=int,
+        default=None,
+        help="ONNX Runtime intra-op threads for Chatterbox CPU components. Defaults to physical cores.",
+    )
+    parser.add_argument(
+        "--tts-backend",
+        choices=["auto", "onnx", "transformer", "atom_vllm"],
+        default=os.environ.get("ATOM_CHATTERBOX_BACKEND", "auto"),
+        help="Preferred Chatterbox backend for /v1/audio/speech.",
+    )
+    parser.add_argument(
+        "--tts-vllm-source",
+        type=str,
+        default=os.environ.get(
+            "ATOM_CHATTERBOX_VLLM_SOURCE",
+            "/home/local/ai/engines/chatterbox-vllm",
+        ),
+        help="Path to the chatterbox-vllm source checkout.",
+    )
+    parser.add_argument(
+        "--tts-vllm-max-model-len",
+        type=int,
+        default=1000,
+        help="Maximum T3 sequence length for atom_vllm.",
+    )
+    parser.add_argument(
+        "--tts-vllm-max-batch-size",
+        type=int,
+        default=10,
+        help="Maximum prompt batch size for atom_vllm.",
+    )
+    parser.add_argument(
+        "--tts-vllm-gpu-memory-utilization",
+        type=float,
+        default=None,
+        help="vLLM GPU memory utilization override for atom_vllm.",
+    )
+    parser.add_argument(
+        "--tts-vllm-compile",
+        action="store_true",
+        help="Allow vLLM compilation for atom_vllm instead of enforcing eager execution.",
+    )
+    parser.add_argument(
+        "--tts-default-voice",
+        type=str,
+        default=os.environ.get(
+            "ATOM_CHATTERBOX_DEFAULT_VOICE",
+            "/home/local/ai/projects/DEMERZEL/servers/pipecat-voice/data/kokoro-refs/af_bella.wav",
+        ),
+        help="Default Chatterbox reference voice. Defaults to DEMERZEL af_bella.",
+    )
+    parser.add_argument(
         "--fish-speech-model",
         type=str,
         default=None,
@@ -1198,6 +1297,17 @@ def main():
         default=None,
         help="Path to VoxCPM2 model directory (openbmb/VoxCPM2). "
         "Enables VoxCPM2 engine for /v1/audio/speech.",
+    )
+    parser.add_argument(
+        "--lfm25-audio",
+        action="store_true",
+        help="Enable the LFM2.5-Audio llama.cpp bridge for TTS and STT.",
+    )
+    parser.add_argument(
+        "--lfm25-audio-url",
+        type=str,
+        default=os.environ.get("ATOM_LFM25_AUDIO_URL", "http://127.0.0.1:30008/v1"),
+        help="Base URL for a running llama-liquid-audio-server.",
     )
     args = parser.parse_args()
 
@@ -1255,7 +1365,7 @@ def main():
 
     # Initialize TTS engines (multi-model support)
     global speech_serving
-    _any_tts = args.tts_model or args.fish_speech_model or args.voxcpm2_model
+    _any_tts = args.tts_model or args.fish_speech_model or args.voxcpm2_model or args.lfm25_audio
     if _any_tts:
         from atom.entrypoints.openai.serving_speech import SpeechServing
 
@@ -1274,14 +1384,48 @@ def main():
                 model_dir=args.tts_model,
                 backbone_dir=args.tts_backbone,
                 variant=args.tts_variant,
+                onnx_variant=args.tts_onnx_variant,
                 device=args.tts_device,
                 dtype=args.tts_dtype,
+                num_threads=args.tts_onnx_threads,
             )
             chatterbox_engine.load()
+            speech_serving.register_engine("chatterbox_fallback", chatterbox_engine)
+            speech_serving.register_engine("chatterbox_onnx", chatterbox_engine)
+            if args.tts_backbone:
+                speech_serving.register_engine("chatterbox_transformer", chatterbox_engine)
+
+            default_chatterbox_engine = chatterbox_engine
+            if args.tts_backend in ("auto", "atom_vllm"):
+                from atom.audio.chatterbox.vllm_backend import ChatterboxAtomVllmEngine
+
+                atom_vllm_engine = ChatterboxAtomVllmEngine(
+                    model_dir=args.tts_model,
+                    variant=args.tts_variant,
+                    device=args.tts_device,
+                    source_dir=args.tts_vllm_source,
+                    max_model_len=args.tts_vllm_max_model_len,
+                    max_batch_size=args.tts_vllm_max_batch_size,
+                    gpu_memory_utilization=args.tts_vllm_gpu_memory_utilization,
+                    enforce_eager=not args.tts_vllm_compile,
+                    default_voice_path=args.tts_default_voice,
+                    fallback_engine=chatterbox_engine,
+                )
+                atom_vllm_engine.load()
+                speech_serving.register_engine("atom_vllm", atom_vllm_engine)
+                speech_serving.register_engine("chatterbox_atom_vllm", atom_vllm_engine)
+                if (
+                    args.tts_backend == "atom_vllm"
+                    or atom_vllm_engine.unavailable_reason is None
+                ):
+                    default_chatterbox_engine = atom_vllm_engine
+
             speech_serving.register_engine(
-                "chatterbox", chatterbox_engine, default=True,
+                "chatterbox",
+                default_chatterbox_engine,
+                default=True,
             )
-            _tts_engines_loaded.append("chatterbox")
+            _tts_engines_loaded.append(f"chatterbox:{args.tts_backend}")
 
         # Fish Speech S2 Pro
         if args.fish_speech_model:
@@ -1322,6 +1466,21 @@ def main():
                 default=not _tts_engines_loaded,
             )
             _tts_engines_loaded.append("voxcpm2")
+
+        # LFM2.5-Audio llama.cpp bridge
+        if args.lfm25_audio:
+            global lfm25_audio_client
+            from atom.audio.lfm25_audio import LFM25AudioClient, LFM25AudioEngine
+
+            lfm25_audio_client = LFM25AudioClient(base_url=args.lfm25_audio_url)
+            lfm25_engine = LFM25AudioEngine(lfm25_audio_client)
+            speech_serving.register_engine(
+                "lfm25_audio",
+                lfm25_engine,
+                default=not _tts_engines_loaded,
+            )
+            speech_serving.register_engine("lfm2.5-audio", lfm25_engine)
+            _tts_engines_loaded.append("lfm25_audio")
 
         logger.info(
             "Speech API enabled at /v1/audio/speech with engines: %s",

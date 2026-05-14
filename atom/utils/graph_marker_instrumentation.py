@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 import ast
-import os
 import re
 from dataclasses import dataclass
 from typing import Iterable, Optional
+
+from atom.utils.file_finder import find_files
 
 _SUBGRAPH_ID_RE = re.compile(r"artifact_shape_[^/]+_subgraph_(\d+)")
 
@@ -179,10 +180,9 @@ def _extract_graph_marker_name(line: str) -> Optional[str]:
 
 
 def _iter_py_files(root: str) -> Iterable[str]:
-    for dirpath, _, filenames in os.walk(root):
-        for fn in filenames:
-            if fn.endswith(".py"):
-                yield os.path.join(dirpath, fn)
+    for path in find_files(root):
+        if path.endswith(".py"):
+            yield path
 
 
 def _initial_docstring_span(lines: list[str]) -> Optional[tuple[int, int]]:

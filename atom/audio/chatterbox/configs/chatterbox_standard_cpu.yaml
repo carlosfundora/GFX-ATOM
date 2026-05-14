@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────
+# Chatterbox Standard — CPU Execution Profile
+# Validated on FRACTAL (Ryzen 9 3900X / AMD RX 6700 XT / ROCm 7.2)
+# ─────────────────────────────────────────────────────────────
+# Last Updated: 2026-05-13
+
+model:
+  name: "Chatterbox-Standard-ONNX"
+  hub_id: "onnx-community/chatterbox-ONNX"
+  variant: "standard"
+  backbone_arch: "LlamaForCausalLM"
+  parameters_m: 500
+  num_hidden_layers: 30
+  num_heads: 16
+  head_dim: 64
+  vocab_size: 8194
+  sample_rate: 24000
+
+paths:
+  model_dir: "/home/local/Projects/models/huggingface/models--onnx-community--chatterbox-ONNX/snapshots/3cab09af388d3f02bba43443fce88c1f4525ac43"
+  default_voice: "${model_dir}/default_voice.wav"
+
+runtime:
+  device: "cpu"
+  dtype: "float16"
+  onnx_variant: "fp16"
+  # ONNX Runtime thread tuning for Ryzen 9 3900X (12 cores / 24 threads):
+  # - intra_op_threads: physical cores (12) for maximum per-op parallelism
+  # - inter_op_threads: 1 for single-task mode (no thread contention)
+  # - graph_optimization: ORT_ENABLE_ALL (constant folding, node fusion, layout opt)
+  intra_op_threads: 12
+  inter_op_threads: 1
+  graph_optimization_level: "ORT_ENABLE_ALL"
+
+generation:
+  max_tokens: 512
+  repetition_penalty: 1.2
+  temperature: 0.0           # CPU path uses greedy argmax (deterministic)
+  exaggeration: 0.5
+  seed: null
+  cfg_weight: 0              # Disable CFG for batch_size=1 (faster)
+
+audio:
+  response_format: "wav"
+  bits_per_sample: 16
+
+dsp:
+  enable_agc: false
+  enable_soft_compressor: false
+  agc_target_rms_dbfs: -18.0
+  agc_attack: 0.01
+  agc_release: 0.1
+  soft_compressor_threshold: 0.5
+  soft_compressor_ratio: 4.0
+
+benchmarks:
+  # Baseline (unoptimized, num_threads=4, both inter/intra):
+  #   generate_sec: 33.7s, tok_per_sec: 15.2, decode_sec: 36.8s, RTF: 3.47
+  # Optimized (intra=12, inter=1, ORT_ENABLE_ALL):
+  #   TBD — pending re-test
+
+notes: |
+  CPU-only configuration. All ONNX components run via CPUExecutionProvider.
+  
+  ONNX RT Tuning:
+  - inter_op=1 avoids thread contention for single-request workloads
+  - intra_op=12 (physical cores) maximizes parallelism within each operator
+  - ORT_ENABLE_ALL enables constant folding, node fusion, and layout optimization
+  
+  The CPU path uses greedy argmax decoding which is deterministic and produces
+  clean audio. This is the baseline reference configuration.
+  
+  For further speedup, consider INT8 quantization if the CPU supports AVX-512.
+  The Ryzen 9 3900X supports AVX2 (not AVX-512), so FP16 remains optimal.

@@ -10,11 +10,13 @@ standalone engine architecture (no stage pipeline).
 
 import asyncio
 import base64
+import inspect
 import io
 import logging
 import os
 import re
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -159,6 +161,31 @@ class SpeechServing:
             raise HTTPException(status_code=503, detail="No default TTS engine")
         return self._default_engine, self._engines[self._default_engine]
 
+    def _resolve_backend_engine(
+        self,
+        model_name: str,
+        engine: Any,
+        backend: str | None,
+    ) -> tuple[str, Any]:
+        """Switch to a registered backend-specific engine when requested."""
+        if not backend or backend == "auto":
+            return model_name, engine
+        candidates = (
+            backend,
+            f"chatterbox_{backend}",
+            f"{model_name}_{backend}",
+        )
+        for candidate in candidates:
+            if candidate in self._engines:
+                return candidate, self._engines[candidate]
+        return model_name, engine
+
+    def _request_backend(self, request: Any) -> str | None:
+        """Resolve backend override, with extra_params as the final override."""
+        backend = getattr(request, "backend", None)
+        extra_params = getattr(request, "extra_params", None) or {}
+        return extra_params.get("backend") or backend
+
     # ------------------------------------------------------------------
     #  Core speech generation
     # ------------------------------------------------------------------
@@ -167,6 +194,11 @@ class SpeechServing:
         """Generate speech from text and return audio bytes."""
         t0 = time.time()
         model_name, engine = self._resolve_engine(request.model)
+        model_name, engine = self._resolve_backend_engine(
+            model_name,
+            engine,
+            self._request_backend(request),
+        )
 
         # Resolve uploaded voice to ref_audio
         self._apply_uploaded_speaker(request)
@@ -218,25 +250,18 @@ class SpeechServing:
             },
         )
 
-    def _run_engine(self, engine: Any, request: AudioSpeechRequest) -> tuple[np.ndarray, dict]:
-        """Run the appropriate engine based on its type."""
-        from atom.audio.chatterbox.engine import ChatterboxEngine
+    def _filter_generate_kwargs(self, engine: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Drop unsupported knobs for engines that do not accept **kwargs."""
+        try:
+            sig = inspect.signature(engine.generate)
+        except (TypeError, ValueError):
+            return kwargs
+        if any(param.kind == inspect.Parameter.VAR_KEYWORD for param in sig.parameters.values()):
+            return kwargs
+        return {key: value for key, value in kwargs.items() if key in sig.parameters}
 
-        if isinstance(engine, ChatterboxEngine):
-            return engine.generate(
-                text=request.input,
-                ref_audio_path=request.ref_audio or (
-                    request.voice
-                    if request.voice and request.voice != "default"
-                    else None
-                ),
-                exaggeration=request.exaggeration,
-                max_tokens=request.max_tokens,
-                repetition_penalty=request.repetition_penalty,
-                seed=request.seed,
-            )
-
-        # Generic engine interface
+    def _speech_generate_kwargs(self, request: AudioSpeechRequest) -> dict[str, Any]:
+        """Build engine kwargs from OpenAI request fields and extra params."""
         kwargs: dict[str, Any] = {}
         if request.ref_audio is not None:
             kwargs["ref_audio_path"] = request.ref_audio
@@ -250,8 +275,38 @@ class SpeechServing:
             kwargs["seed"] = request.seed
         if request.voice and request.voice != "default":
             kwargs["voice"] = request.voice
+            if Path(request.voice).expanduser().exists():
+                kwargs.setdefault("ref_audio_path", request.voice)
+        kwargs.update(
+            {
+                "exaggeration": request.exaggeration,
+                "repetition_penalty": request.repetition_penalty,
+                "temperature": request.temperature,
+                "top_p": request.top_p,
+                "min_p": request.min_p,
+            }
+        )
+        optional_fields = (
+            "backend",
+            "batch_size",
+            "chunk_chars",
+            "cfg_weight",
+            "diffusion_steps",
+            "gpu_memory_utilization",
+            "enforce_eager",
+        )
+        for field in optional_fields:
+            value = getattr(request, field)
+            if value is not None:
+                kwargs[field] = value
         if request.extra_params:
             kwargs.update(request.extra_params)
+        return kwargs
+
+    def _run_engine(self, engine: Any, request: AudioSpeechRequest) -> tuple[np.ndarray, dict]:
+        """Run the selected engine with compatible request parameters."""
+        kwargs = self._speech_generate_kwargs(request)
+        kwargs = self._filter_generate_kwargs(engine, kwargs)
 
         return engine.generate(text=request.input, **kwargs)
 
@@ -298,6 +353,78 @@ class SpeechServing:
     #  Batch synthesis
     # ------------------------------------------------------------------
 
+    def _batch_item_request(
+        self,
+        request: BatchSpeechRequest,
+        item: Any,
+    ) -> AudioSpeechRequest:
+        merged_extra = dict(request.extra_params or {})
+        if item.extra_params:
+            merged_extra.update(item.extra_params)
+
+        item_request = AudioSpeechRequest(
+            input=item.input,
+            model=request.model,
+            voice=item.voice or request.voice,
+            response_format=item.response_format or request.response_format,
+            ref_audio=item.ref_audio or request.ref_audio,
+            ref_text=item.ref_text or request.ref_text,
+            backend=item.backend or request.backend,
+            batch_size=item.batch_size or request.batch_size,
+            chunk_chars=item.chunk_chars or request.chunk_chars,
+            cfg_weight=(
+                item.cfg_weight if item.cfg_weight is not None else request.cfg_weight
+            ),
+            diffusion_steps=(
+                item.diffusion_steps
+                if item.diffusion_steps is not None
+                else request.diffusion_steps
+            ),
+            gpu_memory_utilization=request.gpu_memory_utilization,
+            enforce_eager=request.enforce_eager,
+            temperature=(
+                item.temperature if item.temperature is not None else request.temperature
+            ),
+            top_p=item.top_p if item.top_p is not None else request.top_p,
+            min_p=item.min_p if item.min_p is not None else request.min_p,
+            exaggeration=(
+                item.exaggeration
+                if item.exaggeration is not None
+                else request.exaggeration
+            ),
+            max_tokens=(
+                item.max_tokens if item.max_tokens is not None else request.max_tokens
+            ),
+            repetition_penalty=(
+                item.repetition_penalty
+                if item.repetition_penalty is not None
+                else request.repetition_penalty
+            ),
+            extra_params=merged_extra or None,
+        )
+        self._apply_uploaded_speaker(item_request)
+        return item_request
+
+    def _encode_batch_result(
+        self,
+        idx: int,
+        item_request: AudioSpeechRequest,
+        engine: Any,
+        wav: np.ndarray,
+    ) -> SpeechBatchItemResult:
+        sample_rate = self._get_sample_rate(engine)
+        audio_bytes, media_type = audio_to_bytes(
+            wav,
+            sample_rate,
+            item_request.response_format,
+        )
+        return SpeechBatchItemResult(
+            index=idx,
+            status="success",
+            audio_data=base64.b64encode(audio_bytes).decode(),
+            media_type=media_type,
+        )
+
     async def create_speech_batch(
         self,
         request: BatchSpeechRequest,
@@ -306,41 +433,46 @@ class SpeechServing:
         results = []
         succeeded = 0
         failed = 0
-        _, engine = self._resolve_engine(request.model)
+        model_name, engine = self._resolve_engine(request.model)
+        model_name, engine = self._resolve_backend_engine(
+            model_name,
+            engine,
+            self._request_backend(request),
+        )
+        item_requests = [
+            self._batch_item_request(request, item) for item in request.items
+        ]
 
-        for idx, item in enumerate(request.items):
+        if hasattr(engine, "generate_batch") and len(item_requests) > 1:
+            batch_kwargs = [
+                self._filter_generate_kwargs(engine, self._speech_generate_kwargs(req))
+                for req in item_requests
+            ]
+            first_kwargs = batch_kwargs[0]
+            if all(kwargs == first_kwargs for kwargs in batch_kwargs[1:]):
+                try:
+                    batch_outputs = engine.generate_batch(
+                        [req.input for req in item_requests],
+                        **first_kwargs,
+                    )
+                    for idx, (req, output) in enumerate(zip(item_requests, batch_outputs)):
+                        wav, _metrics = output
+                        results.append(self._encode_batch_result(idx, req, engine, wav))
+                        succeeded += 1
+                    return BatchSpeechResponse(
+                        id=f"batch-{uuid.uuid4().hex[:12]}",
+                        results=results,
+                        total=len(request.items),
+                        succeeded=succeeded,
+                        failed=failed,
+                    )
+                except Exception as exc:
+                    logger.warning("Batched speech path failed; falling back per item: %s", exc)
+
+        for idx, item_request in enumerate(item_requests):
             try:
-                item_request = AudioSpeechRequest(
-                    input=item.input,
-                    model=request.model,
-                    voice=item.voice or request.voice,
-                    response_format=item.response_format or request.response_format,
-                    ref_audio=item.ref_audio or request.ref_audio,
-                    ref_text=item.ref_text or request.ref_text,
-                    exaggeration=(
-                        item.exaggeration
-                        if item.exaggeration is not None
-                        else request.exaggeration
-                    ),
-                    max_tokens=(
-                        item.max_tokens
-                        if item.max_tokens is not None
-                        else request.max_tokens
-                    ),
-                    repetition_penalty=request.repetition_penalty,
-                )
                 wav, metrics = self._run_engine(engine, item_request)
-                sample_rate = self._get_sample_rate(engine)
-                audio_bytes, media_type = audio_to_bytes(
-                    wav, sample_rate,
-                    item.response_format or request.response_format,
-                )
-                results.append(SpeechBatchItemResult(
-                    index=idx,
-                    status="success",
-                    audio_data=base64.b64encode(audio_bytes).decode(),
-                    media_type=media_type,
-                ))
+                results.append(self._encode_batch_result(idx, item_request, engine, wav))
                 succeeded += 1
             except Exception as e:
                 results.append(SpeechBatchItemResult(
@@ -350,7 +482,6 @@ class SpeechServing:
                 ))
                 failed += 1
 
-        import uuid
         return BatchSpeechResponse(
             id=f"batch-{uuid.uuid4().hex[:12]}",
             results=results,

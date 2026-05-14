@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""ATOM audio module — TTS model integrations."""
+"""Compatibility exports for Chatterbox ONNX Runtime helpers."""
 
 from atom.audio.runtime import (
     DEFAULT_ONNX_CPU_PROVIDER,

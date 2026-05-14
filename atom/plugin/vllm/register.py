@@ -1,5 +1,8 @@
-from typing import Optional
 import logging
+import os
+import sys
+from pathlib import Path
+from typing import Optional
 
 import torch
 from atom.plugin.prepare import _set_framework_backbone
@@ -87,7 +90,41 @@ def _patch_vllm_attention_process_weights_after_loading(attention) -> None:
     attention.process_weights_after_loading = wrapped
 
 
+def _register_chatterbox_vllm_model() -> bool:
+    source = os.environ.get("ATOM_CHATTERBOX_VLLM_SOURCE")
+    if not source:
+        return False
+
+    src = Path(source).expanduser()
+    if not src.exists():
+        logger.warning("Chatterbox-vLLM source path does not exist: %s", src)
+        return False
+    src_str = str(src)
+    if src_str not in sys.path:
+        sys.path.insert(0, src_str)
+
+    try:
+        from atom.audio.chatterbox.vllm_backend import _load_chatterbox_tts_class
+
+        _load_chatterbox_tts_class(src)
+        import vllm.model_executor.models.registry as vllm_model_registry
+
+        vllm_model_registry.ModelRegistry.register_model(
+            "ChatterboxT3",
+            "chatterbox_vllm.models.t3.t3:T3VllmModel",
+        )
+        vllm_model_registry._try_load_model_cls.cache_clear()
+        vllm_model_registry._try_inspect_model_cls.cache_clear()
+    except Exception as exc:
+        logger.warning("Unable to register ChatterboxT3 for vLLM worker: %s", exc)
+        return False
+
+    logger.info("Registered ChatterboxT3 donor model for vLLM")
+    return True
+
+
 def register_model() -> None:
+    chatterbox_registered = _register_chatterbox_vllm_model()
     if disable_vllm_plugin:
         logger.info("Disable ATOM model register")
         return
@@ -113,7 +150,7 @@ def register_model() -> None:
         any_updated = True
 
     # clear lru cache
-    if any_updated:
+    if any_updated or chatterbox_registered:
         vllm_model_registry._try_load_model_cls.cache_clear()
         vllm_model_registry._try_inspect_model_cls.cache_clear()
 

@@ -110,6 +110,47 @@ class AudioSpeechRequest(BaseModel):
         le=3.0,
         description="Repetition penalty for speech token generation",
     )
+    backend: Literal["auto", "onnx", "transformer", "atom_vllm", "lfm25_audio"] | None = Field(
+        default=None,
+        description="Chatterbox backend override.",
+    )
+    batch_size: int | None = Field(
+        default=None,
+        ge=1,
+        le=64,
+        description="Chunk batch size for batched Chatterbox backends.",
+    )
+    chunk_chars: int | None = Field(
+        default=None,
+        ge=32,
+        le=2000,
+        description="Approximate text chunk size for Chatterbox batching.",
+    )
+    cfg_weight: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=5.0,
+        description="Classifier-free guidance scale for Chatterbox T3.",
+    )
+    diffusion_steps: int | None = Field(
+        default=None,
+        ge=1,
+        le=100,
+        description="S3Gen diffusion steps for Chatterbox decode.",
+    )
+    gpu_memory_utilization: float | None = Field(
+        default=None,
+        gt=0.0,
+        le=1.0,
+        description="vLLM GPU memory utilization override for atom_vllm.",
+    )
+    enforce_eager: bool | None = Field(
+        default=None,
+        description="Disable vLLM compilation/CUDA graphs for atom_vllm.",
+    )
+    temperature: float = Field(default=0.8, ge=0.0, le=5.0)
+    top_p: float = Field(default=1.0, gt=0.0, le=1.0)
+    min_p: float = Field(default=0.05, ge=0.0, le=1.0)
 
     # Model-specific extra parameters
     extra_params: dict[str, Any] | None = Field(
@@ -179,6 +220,16 @@ class SpeechBatchItem(BaseModel):
     # Chatterbox-specific
     exaggeration: float | None = None
     max_tokens: int | None = None
+    backend: Literal["auto", "onnx", "transformer", "atom_vllm", "lfm25_audio"] | None = None
+    batch_size: int | None = Field(default=None, ge=1, le=64)
+    chunk_chars: int | None = Field(default=None, ge=32, le=2000)
+    cfg_weight: float | None = Field(default=None, ge=0.0, le=5.0)
+    diffusion_steps: int | None = Field(default=None, ge=1, le=100)
+    temperature: float | None = Field(default=None, ge=0.0, le=5.0)
+    top_p: float | None = Field(default=None, gt=0.0, le=1.0)
+    min_p: float | None = Field(default=None, ge=0.0, le=1.0)
+    repetition_penalty: float | None = Field(default=None, ge=1.0, le=3.0)
+    extra_params: dict[str, Any] | None = None
 
 
 class BatchSpeechRequest(BaseModel):
@@ -201,6 +252,17 @@ class BatchSpeechRequest(BaseModel):
     repetition_penalty: float = 1.2
     exaggeration: float = 0.5
     max_tokens: int = 512
+    backend: Literal["auto", "onnx", "transformer", "atom_vllm", "lfm25_audio"] | None = None
+    batch_size: int | None = Field(default=None, ge=1, le=64)
+    chunk_chars: int | None = Field(default=None, ge=32, le=2000)
+    cfg_weight: float | None = Field(default=None, ge=0.0, le=5.0)
+    diffusion_steps: int | None = Field(default=None, ge=1, le=100)
+    gpu_memory_utilization: float | None = Field(default=None, gt=0.0, le=1.0)
+    enforce_eager: bool | None = None
+    temperature: float = Field(default=0.8, ge=0.0, le=5.0)
+    top_p: float = Field(default=1.0, gt=0.0, le=1.0)
+    min_p: float = Field(default=0.05, ge=0.0, le=1.0)
+    extra_params: dict[str, Any] | None = None
 
 
 class SpeechBatchItemResult(BaseModel):

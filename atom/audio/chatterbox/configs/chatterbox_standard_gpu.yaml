@@ -1,0 +1,100 @@
+# ─────────────────────────────────────────────────────────────
+# Chatterbox Standard — GPU Execution Profile
+# Validated on FRACTAL (Ryzen 9 3900X / AMD RX 6700 XT gfx1030 / ROCm 7.2)
+# ─────────────────────────────────────────────────────────────
+# Last Updated: 2026-05-13
+
+model:
+  name: "Chatterbox-Standard-GPU"
+  hub_id: "onnx-community/chatterbox-ONNX"
+  backbone_hub_id: "vladislavbro/llama_backbone_0.5"
+  variant: "standard"
+  backbone_arch: "LlamaForCausalLM"
+  parameters_m: 500
+  num_hidden_layers: 30
+  num_heads: 16
+  head_dim: 64
+  vocab_size: 8194
+  sample_rate: 24000
+
+paths:
+  model_dir: "/home/local/Projects/models/huggingface/models--onnx-community--chatterbox-ONNX/snapshots/3cab09af388d3f02bba43443fce88c1f4525ac43"
+  backbone_dir: "/home/local/Projects/models/huggingface/models--vladislavbro--llama_backbone_0.5/snapshots/a6c48da4d993a2058b95a8c3e2178da29f603f3e"
+  default_voice: "${model_dir}/default_voice.wav"
+
+runtime:
+  device: "cuda:0"
+  dtype: "float16"             # RDNA2 gfx1030 — always float16, never bfloat16
+  onnx_variant: "fp16"
+  # ONNX RT (CPU components: speech_encoder, embed_tokens, conditional_decoder)
+  intra_op_threads: 12         # Physical cores (Ryzen 9 3900X)
+  inter_op_threads: 1          # Single-task mode
+  graph_optimization_level: "ORT_ENABLE_ALL"
+
+generation:
+  max_tokens: 512
+  repetition_penalty: 1.2
+  temperature: 1.0             # GPU path uses multinomial sampling
+  top_k: 50                    # Top-K filtering before multinomial sampling
+  exaggeration: 0.5
+  cfg_weight: 0                # Disable CFG for batch_size=1 (faster, ~170-210 tok/s)
+  seed: null
+
+audio:
+  response_format: "wav"
+  bits_per_sample: 16
+
+dsp:
+  enable_agc: false
+  enable_soft_compressor: false
+  agc_target_rms_dbfs: -18.0
+  agc_attack: 0.01
+  agc_release: 0.1
+  soft_compressor_threshold: 0.5
+  soft_compressor_ratio: 4.0
+
+gpu:
+  # RDNA2-specific settings
+  hip_visible_devices: "0"
+  vram_budget_mb: 1200         # ~1.2 GB for 500M float16 model + KV cache
+  torch_compile: false         # torch.compile not well supported on gfx1030
+  attention_backend: "triton"  # Never aiter on gfx1030 (illegal instruction)
+  # gfxGRAPH: HIP graph capture for autoregressive loop
+  # Captures the GPU kernel launch sequence to reduce CPU overhead.
+  # Equivalent to cudagraphs-manual in the native Chatterbox engine.
+  gfx_graph:
+    enabled: true              # gfxGRAPH outperforms CUDA graphs on ROCm 7.2
+    backend: "hip-graphs"      # ROCm native graph capture
+    warmup_iterations: 2       # Warm up before graph capture
+    t3_params:
+      initial_forward_pass_backend: "eager"         # Safe default
+      generate_token_backend: "eager"               # "hip-graphs" once validated
+      # stride_length: 4       # Future: compile 1-4 iteration steps together
+      skip_when_1: true        # Skip TopP when p=1.0
+
+benchmarks:
+  # Native Chatterbox (reference, CUDA):
+  #   CFG on:  ~155-170 tok/s (batch_size=2)
+  #   CFG off: ~170-210 tok/s (batch_size=1)
+  # ATOM GPU (current):
+  #   TBD — pending re-test with optimized ONNX RT for CPU components
+
+notes: |
+  Hybrid CPU/GPU configuration for maximum throughput.
+  
+  Split execution:
+    GPU: LlamaForCausalLM backbone (autoregressive token generation via HuggingFace)
+    CPU: speech_encoder, embed_tokens, conditional_decoder (ONNX Runtime, optimized)
+  
+  gfxGRAPH (HIP Graph Capture):
+    The native Chatterbox engine achieves 155-210 tok/s using cudagraphs-manual.
+    The ROCm equivalent is HIP graph capture, which reduces CPU launch overhead
+    by replaying a captured kernel sequence. This is marked for future validation
+    on RDNA2/gfx1030.
+  
+  CFG (Classifier-Free Guidance):
+    cfg_weight=0 disables CFG, halving batch size to 1 and boosting throughput
+    by ~20-30%. Quality is slightly lower but acceptable for most use cases.
+  
+  IMPORTANT: Temperature=0.0 uses greedy argmax (may cause speech loops).
+  Temperature=1.0 with top_k=50 provides diverse, natural-sounding speech.
