@@ -164,10 +164,11 @@ class Glm4MoE(nn.Module):
 
         # router_logits: (num_tokens, n_experts)
         router_logits = self.gate(hidden_states.to(dtype=torch.float32))
-        if (
-            self.n_shared_experts is not None
-            and not is_rocm_aiter_fusion_shared_expert_enabled()
-        ):
+
+        # Optimization: Replaced repeated calls to `is_rocm_aiter_fusion_shared_expert_enabled()`
+        # in the hot path with a check on `self.shared_experts`. The `shared_experts` attribute
+        # is only populated in `__init__` when fusion is explicitly disabled.
+        if getattr(self, "shared_experts", None) is not None:
             shared_output = self.shared_experts(hidden_states)
         final_hidden_states = self.experts(
             hidden_states=hidden_states, router_logits=router_logits
@@ -176,10 +177,8 @@ class Glm4MoE(nn.Module):
         if not is_rocm_aiter_fuse_routed_scaling_factor():
             final_hidden_states = final_hidden_states * self.routed_scaling_factor
 
-        if (
-            self.shared_experts is not None
-            and not is_rocm_aiter_fusion_shared_expert_enabled()
-        ):
+        # Optimization: Replaced redundant fusion check in hot path
+        if getattr(self, "shared_experts", None) is not None:
             final_hidden_states = final_hidden_states + shared_output
 
         if self.tp_size > 1:

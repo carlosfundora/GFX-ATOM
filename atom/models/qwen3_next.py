@@ -250,14 +250,20 @@ class Qwen3NextSparseMoeBlock(nn.Module):
 
         # router_logits: (num_tokens, n_experts + 1)
         logits = self.gate(hidden_states)
-        if not is_rocm_aiter_fusion_shared_expert_enabled():
+
+        # Optimization: Replaced repeated calls to `is_rocm_aiter_fusion_shared_expert_enabled()`
+        # in the hot path with a check on `self.shared_expert`. The `shared_expert` attribute
+        # is only populated in `__init__` when fusion is explicitly disabled.
+        if getattr(self, "shared_expert", None) is not None:
             router_logits = logits[:, : self.n_routed_experts]
         else:
             router_logits = logits
         routed_output = self.experts(
             hidden_states=hidden_states, router_logits=router_logits
         )
-        if not is_rocm_aiter_fusion_shared_expert_enabled():
+
+        # Optimization: Replaced redundant fusion check in hot path
+        if getattr(self, "shared_expert", None) is not None:
             shared_output = self.shared_expert(hidden_states)
             # Apply shared expert gate: the merged gate output contains
             # [routed_logits, shared_expert_gate_logits], extract the tail

@@ -895,10 +895,11 @@ class DeepseekV2MoE(nn.Module):
         hidden_states: torch.Tensor,
     ) -> torch.Tensor:
         shared_output = None
-        if (
-            self.n_shared_experts is not None
-            and not is_rocm_aiter_fusion_shared_expert_enabled()
-        ):
+
+        # Optimization: Replaced repeated calls to `is_rocm_aiter_fusion_shared_expert_enabled()`
+        # in the hot path with a check on `self.shared_experts`. The `shared_experts` attribute
+        # is only populated in `__init__` when fusion is explicitly disabled.
+        if getattr(self, "shared_experts", None) is not None:
             shared_output = self.shared_experts(hidden_states)
 
         final_hidden_states = self.routed_expert_forward(hidden_states)
