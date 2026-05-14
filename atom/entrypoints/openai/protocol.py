@@ -133,6 +133,7 @@ class EmbeddingRequest(BaseModel):
     input: Union[str, List[str]]
     user: Optional[str] = None
     encoding_format: Optional[str] = None
+    dimensions: Optional[int] = None
 
 
 class EmbeddingObject(BaseModel):

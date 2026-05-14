@@ -133,6 +133,10 @@ environment_variables: dict[str, Callable[[], Any]] = {
     # Force-enable/disable Wave32-optimized HIP kernels for gfx1030.
     # "auto" (default) probes hardware; "1"/"true" force-enables; "0"/"false" disables.
     "ATOM_RDNA2_KERNELS": lambda: os.getenv("ATOM_RDNA2_KERNELS", "auto"),
+    # Enable the gfxGRAPH Rust bridge for CUDA Graph parity on RDNA2.
+    # Uses BucketRouter + ConditionalGraphRunner from gfxgraph_rs (PyO3).
+    # Requires `maturin develop --release` in gfxGRAPH/gfxgraph_rs/.
+    "ATOM_ENABLE_GFXGRAPH": lambda: os.getenv("ATOM_ENABLE_GFXGRAPH", "0") == "1",
     # --- GGUF / 1-Bit Model Support ---
     # Enable GGUF weight loading (Q1_0, Q4_0, Q8_0, etc.).
     "ATOM_ENABLE_GGUF": lambda: os.getenv("ATOM_ENABLE_GGUF", "1") == "1",

@@ -415,6 +415,9 @@ class LinearBase(nn.Module):
         if backend != "aiter":
             raise RuntimeError(f"Unsupported backend '{backend}' for linear: {reason}")
         if self.quant_type.value == QuantType.No.value:
+            otype = self.weight.dtype
+            if x.dtype != self.weight.dtype:
+                x = x.to(self.weight.dtype)
             y = tgemm.mm(
                 x,
                 self.weight,

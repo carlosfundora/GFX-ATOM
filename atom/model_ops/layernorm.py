@@ -15,7 +15,10 @@ from aiter import (
 from aiter.dist.communication_op import tensor_model_parallel_fused_allreduce_rmsnorm
 from aiter.dist.parallel_state import get_tensor_model_parallel_world_size
 from aiter.jit.utils.torch_guard import torch_compile_guard
-from aiter.ops.gated_rmsnorm_fp8_group_quant import gated_rmsnorm_fp8_group_quant
+try:
+    from aiter.ops.gated_rmsnorm_fp8_group_quant import gated_rmsnorm_fp8_group_quant
+except ImportError:
+    gated_rmsnorm_fp8_group_quant = None
 from aiter.ops.triton.fused_add_rmsnorm_pad import fused_add_rmsnorm_pad
 from atom.config import QuantizationConfig
 from atom.kernel_backend import select_kernel_backend
@@ -342,15 +345,16 @@ class RMSNorm(nn.Module):
                 return (x, x_scale), residual_out
             else:
                 if residual is None:
-                    # return rmsnorm2d_fwd(x, self.weight, self.eps).view(ori_shape)
-                    x = rmsnorm2d_fwd_(x, self.weight, self.eps, self.dim)
-                    return x
+                    variance = x.float().pow(2).mean(dim=-1, keepdim=True)
+                    x = x * torch.rsqrt(variance + self.eps).to(dtype=x.dtype)
+                    return x * self.weight
                 else:
-                    # return self.add_rms_forward(x, residual)
-                    x, residual = rmsnorm2d_fwd_with_add_(
-                        x, self.weight, residual, self.eps, self.dim
+                    residual = x + residual
+                    variance = residual.float().pow(2).mean(dim=-1, keepdim=True)
+                    x = residual * torch.rsqrt(variance + self.eps).to(
+                        dtype=residual.dtype
                     )
-                    return x, residual
+                    return x * self.weight, residual
 
 
 class RMSNormGated(nn.Module):
@@ -400,6 +404,7 @@ class RMSNormGated(nn.Module):
         self.group_size_quant = 128  # Default quantization group size
         self.transpose_scale = False  # Whether to transpose scale output
         self.quant_config = quant_config
+        self.gated_rmsnorm_fp8_group_quant = None
 
         if quant_config is not None:
             from aiter import QuantType
@@ -421,7 +426,8 @@ class RMSNormGated(nn.Module):
 
                 # Import kernel when needed
 
-                self.gated_rmsnorm_fp8_group_quant = gated_rmsnorm_fp8_group_quant
+                if gated_rmsnorm_fp8_group_quant is not None:
+                    self.gated_rmsnorm_fp8_group_quant = gated_rmsnorm_fp8_group_quant
 
     def reset_parameters(self):
         torch.nn.init.ones_(self.weight)
@@ -493,6 +499,8 @@ class RMSNormGated(nn.Module):
 
         Performs: out = quantize(rms_norm(x, weight, eps) * silu(z), group_size)
         """
+        if self.gated_rmsnorm_fp8_group_quant is None:
+            return self.forward_native(x, z)
         num_tokens, num_heads, head_dim = x.shape
         # Check kernel constraints
         if (

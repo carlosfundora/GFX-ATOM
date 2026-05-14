@@ -8,12 +8,20 @@ from enum import Enum
 from typing import Callable, List, Optional, Tuple
 
 import torch
-from aiter import ActivationType, QuantType, dtypes, get_hip_quant, topk_softplus
+from aiter import ActivationType, QuantType, dtypes, get_hip_quant
+try:
+    from aiter import topk_softplus
+except ImportError:
+    topk_softplus = None
 from aiter.dist.parallel_state import get_dp_group, get_tp_group
 from aiter.fused_moe import fused_moe
 from aiter.jit.utils.chip_info import get_gfx
 from aiter.jit.utils.torch_guard import torch_compile_guard
-from aiter.ops.shuffle import shuffle_weight, shuffle_scale
+from aiter.ops.shuffle import shuffle_weight
+try:
+    from aiter.ops.shuffle import shuffle_scale
+except ImportError:
+    shuffle_scale = None
 from aiter.utility import fp4_utils
 from atom.config import (
     Config,
@@ -911,6 +919,11 @@ class Mxfp4MoEMethod(FusedMoEMethodBase):
                 w13_scale_2d = layer.w13_weight_scale.view(self.num_experts, -1)
                 w2_scale_2d = layer.w2_weight_scale.view(self.num_experts, -1)
 
+            if shuffle_scale is None:
+                raise RuntimeError(
+                    "AITER shuffle_scale is required for this MoE quantization path "
+                    "but is not available in the active ROCm bridge."
+                )
             shuffled_w13_scale = shuffle_scale(
                 w13_scale_2d, self.num_experts, self.is_guinterleave, True
             )
@@ -2657,6 +2670,11 @@ class FusedMoE(torch.nn.Module):
 
                 topk_ids = topk_ids.to(torch.int32)
             elif scoring_func == "sqrtsoftplus":
+                if topk_softplus is None:
+                    raise RuntimeError(
+                        "AITER topk_softplus is required for sqrtsoftplus MoE "
+                        "routing but is not available in the active ROCm bridge."
+                    )
                 # # DeepSeek-V4 routing: sqrt(softplus(scores)) + bias for selection;
                 # # weights gathered from the unbiased sqrt(softplus(.)) values.
                 tokens_num = router_logits.shape[0]

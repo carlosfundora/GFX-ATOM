@@ -28,6 +28,17 @@ from atom.plugin.config import PluginConfig
 logger = logging.getLogger("atom")
 
 
+def _dtype_from_name(dtype_name: str) -> torch.dtype:
+    normalized = dtype_name.strip().lower()
+    if normalized in {"float16", "fp16", "half"}:
+        return torch.float16
+    if normalized in {"bfloat16", "bf16"}:
+        return torch.bfloat16
+    if normalized in {"float32", "fp32"}:
+        return torch.float32
+    raise ValueError(f"Unsupported ATOM_FORCE_TORCH_DTYPE={dtype_name!r}")
+
+
 @dataclass
 class KVCacheTensor:
     """
@@ -897,6 +908,10 @@ class Config:
         self.hf_config = get_hf_config(
             self.model, trust_remote_code=self.trust_remote_code
         )
+        if force_dtype := os.getenv("ATOM_FORCE_TORCH_DTYPE"):
+            dtype = _dtype_from_name(force_dtype)
+            self.hf_config.torch_dtype = dtype
+            self.hf_config.dtype = dtype
         # transformers 5+ exposes rope_parameters; <5 often only rope_scaling + rope_theta.
         # Synthesize when missing or None so GPT-OSS YaRN (rope_type in rope_scaling) is preserved.
         if getattr(self.hf_config, "rope_parameters", None) is None:

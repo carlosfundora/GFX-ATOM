@@ -1,6 +1,7 @@
 import logging
 
 from atom.models.qwen3 import Qwen3ForCausalLM
+from atom.models.qwen2 import Qwen2ForCausalLM
 from atom.models.qwen3_moe import Qwen3MoeForCausalLM
 from atom.models.glm4_moe import Glm4MoeForCausalLM
 from atom.models.deepseek_v2 import DeepseekV3ForCausalLM
@@ -12,6 +13,7 @@ logger = logging.getLogger("atom")
 
 _ATOM_SUPPORTED_MODELS = {
     "Qwen3ForCausalLM": Qwen3ForCausalLM,
+    "Qwen2ForCausalLM": Qwen2ForCausalLM,
     "Qwen3MoeForCausalLM": Qwen3MoeForCausalLM,
     "Glm4MoeForCausalLM": Glm4MoeForCausalLM,
     "DeepseekV3ForCausalLM": DeepseekV3ForCausalLM,

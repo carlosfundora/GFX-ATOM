@@ -144,6 +144,33 @@ class LLMEngine:
         outputs = [outputs[seq_id] for seq_id in sorted(outputs)]
         return outputs
 
+    def embed(
+        self,
+        inputs: list[str],
+        pooling: str = "last",
+        dimensions: Optional[int] = None,
+    ) -> tuple[list[list[float]], int]:
+        """Run a prefill-only embedding request through the ATOM model runner."""
+        self.core_mgr._rr_counter = 0
+        seqs = [
+            self.io_processor.preprocess_embedding(
+                prompt, pooling=pooling, dimensions=dimensions
+            )
+            for prompt in inputs
+        ]
+        total_tokens = sum(seq.num_prompt_tokens for seq in seqs)
+        self.core_mgr.add_request(seqs)
+        outputs: dict[int, list[float]] = {}
+        while not self.is_finished() and (
+            self.core_mgr.is_alive() or self.core_mgr.is_rest()
+        ):
+            for seq in self.step():
+                self.io_processor.requests.pop(seq.id, None)
+                if seq.embedding is None:
+                    raise RuntimeError(f"Embedding request {seq.id} finished empty")
+                outputs[seq.id] = seq.embedding
+        return [outputs[seq_id] for seq_id in sorted(outputs)], total_tokens
+
     def start_profile(self):
         self.core_mgr.send_utility_command("start_profile")
         logger.info("Profiling started")
@@ -225,6 +252,39 @@ class InputOutputProcessor:
             kv_transfer_params=kv_transfer_params,
         )
         return seqs[0]
+
+    def preprocess_embedding(
+        self,
+        prompt_or_tokens: str | list[int],
+        pooling: str = "last",
+        dimensions: Optional[int] = None,
+    ) -> Sequence:
+        if pooling not in {"last", "mean"}:
+            raise ValueError(f"Unsupported embedding pooling mode: {pooling}")
+        tokens = (
+            self.tokenizer.encode(prompt_or_tokens)
+            if isinstance(prompt_or_tokens, str)
+            else prompt_or_tokens
+        )
+        if not tokens:
+            raise ValueError("Embedding input produced no tokens")
+        seq = Sequence(
+            tokens,
+            self.block_size,
+            SamplingParams(max_tokens=1, temperature=0.0),
+            num_draft_tokens=0,
+            has_per_req_cache=self.has_per_req_cache,
+            is_embedding_request=True,
+            embedding_pooling=pooling,
+            embedding_dimensions=dimensions,
+        )
+        seq.arrive_time = time.time()
+        self.requests[seq.id] = seq
+        logger.info(
+            f"Embedding request {seq.id} arrived, input tokens: {len(tokens)}, "
+            f"pooling={pooling}, dimensions={dimensions}, pending requests: {len(self.requests)}"
+        )
+        return seq
 
     def preprocess_fanout(
         self,

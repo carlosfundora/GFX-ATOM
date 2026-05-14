@@ -35,10 +35,20 @@ from atom.model_loader.weight_utils import (
     filter_duplicate_safetensors_files,
 )
 from atom.model_ops.base_config import QuantizeMethodBase
-from atom.model_ops.moe import (
-    FusedMoEMethodBase,
-    is_rocm_aiter_fusion_shared_expert_enabled,
-)
+try:
+    from atom.model_ops.moe import (
+        FusedMoEMethodBase,
+        is_rocm_aiter_fusion_shared_expert_enabled,
+    )
+except ImportError as exc:
+    logger = logging.getLogger("atom")
+    logger.warning("MoE loader support is unavailable in this ROCm bridge: %s", exc)
+
+    class FusedMoEMethodBase:  # type: ignore[no-redef]
+        pass
+
+    def is_rocm_aiter_fusion_shared_expert_enabled() -> bool:  # type: ignore[no-redef]
+        return False
 from aiter.dist.parallel_state import get_tp_group
 
 from atom.plugin.prepare import is_sglang

@@ -1,14 +1,16 @@
 # SPDX-License-Identifier: MIT
 # Copyright (C) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
+import os
 from typing import Optional
 
 import aiter
 import torch
+import torch.nn.functional as F
 from aiter import fused_qk_norm_rope_cache_quant_shuffle
 from aiter.ops.triton.fused_kv_cache import fused_qk_rope_reshape_and_cache
 from aiter.ops.triton.gluon.pa_decode_gluon import get_recommended_splits
-from aiter.ops.triton.unified_attention import unified_attention
+from aiter.ops.triton.attention.unified_attention import unified_attention
 from atom.config import get_current_atom_config
 from atom.kernel_backend import select_kernel_backend
 from atom.utils.forward_context import ForwardContext, get_forward_context
@@ -24,6 +26,11 @@ from atom.utils.decorators import mark_trace
 from atom.model_ops.base_attention import cp_mha_gather_cache
 
 logger = logging.getLogger("atom")
+
+
+def _force_native_attention() -> bool:
+    value = os.getenv("ATOM_FORCE_NATIVE_ATTENTION", "")
+    return value.lower() in {"1", "true", "yes", "on"}
 
 
 @PagedAttentionImplDecoratorForPluginMode
@@ -258,6 +265,8 @@ class PagedAttentionImpl(nn.Module):
                 q = self.q_norm(q)
             if self.k_norm is not None:
                 k = self.k_norm(k)
+            if _force_native_attention() and not attn_metadata.has_cached:
+                return q, k, v, k_cache, v_cache, k_scale, v_scale
             if self.kv_cache_dtype == "fp8":
                 aiter.reshape_and_cache_with_pertoken_quant(
                     k,
@@ -543,6 +552,30 @@ class PagedAttentionImpl(nn.Module):
         sliding_window = (
             (self.sliding_window, 0, 0) if self.sliding_window > 0 else (-1, -1, 0)
         )
+        if _force_native_attention() and sliding_window[0] < 0 and self.sinks is None:
+            outputs = []
+            cu_q = attn_metadata.cu_seqlens_q.detach().cpu().tolist()
+            cu_k = attn_metadata.cu_seqlens_k.detach().cpu().tolist()
+            for idx in range(len(cu_q) - 1):
+                q_start, q_end = cu_q[idx], cu_q[idx + 1]
+                k_start, k_end = cu_k[idx], cu_k[idx + 1]
+                q_i = q[q_start:q_end].transpose(0, 1).unsqueeze(0)
+                k_i = k[k_start:k_end].transpose(0, 1).unsqueeze(0)
+                v_i = v[k_start:k_end].transpose(0, 1).unsqueeze(0)
+                if q_i.shape[1] != k_i.shape[1]:
+                    repeat = q_i.shape[1] // k_i.shape[1]
+                    k_i = k_i.repeat_interleave(repeat, dim=1)
+                    v_i = v_i.repeat_interleave(repeat, dim=1)
+                out_i = F.scaled_dot_product_attention(
+                    q_i,
+                    k_i,
+                    v_i,
+                    dropout_p=0.0,
+                    is_causal=True,
+                    scale=self.scale,
+                )
+                outputs.append(out_i.squeeze(0).transpose(0, 1))
+            return torch.cat(outputs, dim=0)
         o = aiter.flash_attn_varlen_func(
             q,
             k,

@@ -2,11 +2,12 @@
 ARG BASE_IMAGE="rocm/pytorch:latest"
 ARG OOT_BASE_IMAGE="rocm/atom-dev:latest"
 ARG SGLANG_BASE_IMAGE="rocm/atom-dev:latest"
-ARG GPU_ARCH="gfx942;gfx950"
+ARG GPU_ARCH="gfx1030"
 
 # OOT image extends an ATOM base image that already contains atom/aiter/mori.
 FROM ${OOT_BASE_IMAGE} AS atom_oot
 
+ARG GPU_ARCH
 ARG MAX_JOBS
 ARG VENV_PYTHON="/opt/venv/bin/python"
 ARG VLLM_REPO="https://github.com/vllm-project/vllm.git"
@@ -21,6 +22,15 @@ ENV MAX_JOBS=${MAX_JOBS}
 ENV LD_LIBRARY_PATH="/opt/venv/lib/python3.12/site-packages/torch/lib:${LD_LIBRARY_PATH}"
 ENV VLLM_TARGET_DEVICE=rocm
 ENV CMAKE_MAKE_PROGRAM=/usr/local/bin/ninja
+ENV HSA_OVERRIDE_GFX_VERSION=10.3.0
+ENV PYTORCH_ROCM_ARCH=${GPU_ARCH}
+ENV ROCM_ARCH=${GPU_ARCH}
+ENV GPU_ARCHS=${GPU_ARCH}
+ENV AMDGPU_TARGETS=${GPU_ARCH}
+ENV CMAKE_HIP_ARCHITECTURES=${GPU_ARCH}
+ENV HIP_ARCHITECTURES=${GPU_ARCH}
+ENV HCC_AMDGPU_TARGET=${GPU_ARCH}
+ENV ROCM_TARGETS=${GPU_ARCH}
 
 RUN echo "========== [OOT 1/7] Prepare build tools ==========" && \
     apt-get update && \
@@ -283,6 +293,14 @@ FROM ${BASE_IMAGE} AS base
 ARG GPU_ARCH
 ENV GPU_ARCH_LIST=$GPU_ARCH
 ENV PYTORCH_ROCM_ARCH=$GPU_ARCH
+ENV ROCM_ARCH=$GPU_ARCH
+ENV GPU_ARCHS=$GPU_ARCH
+ENV AMDGPU_TARGETS=$GPU_ARCH
+ENV CMAKE_HIP_ARCHITECTURES=$GPU_ARCH
+ENV HIP_ARCHITECTURES=$GPU_ARCH
+ENV HCC_AMDGPU_TARGET=$GPU_ARCH
+ENV ROCM_TARGETS=$GPU_ARCH
+ENV HSA_OVERRIDE_GFX_VERSION=10.3.0
 
 RUN pip install --upgrade pip && \
     apt-get update && \

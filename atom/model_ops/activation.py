@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (C) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
+import os
 import torch
 from typing import Optional
 from torch import nn
@@ -13,6 +14,31 @@ from aiter.jit.utils.torch_guard import torch_compile_guard
 from aiter import (
     QuantType,
 )
+
+
+def _uses_gfx1030_target() -> bool:
+    arch_env = ";".join(
+        os.getenv(name, "")
+        for name in (
+            "GPU_ARCHS",
+            "PYTORCH_ROCM_ARCH",
+            "ROCM_ARCH",
+            "AMDGPU_TARGETS",
+            "HIP_ARCHITECTURES",
+            "ROCM_TARGETS",
+        )
+    )
+    if "gfx1030" in arch_env.replace(",", ";"):
+        return True
+    if os.getenv("HSA_OVERRIDE_GFX_VERSION") == "10.3.0":
+        return True
+    try:
+        if torch.cuda.is_available():
+            props = torch.cuda.get_device_properties(torch.cuda.current_device())
+            return getattr(props, "gcnArchName", "") == "gfx1030"
+    except Exception:
+        return False
+    return False
 
 
 def mxfp4_act_mul_quant_fuse_fake(
@@ -74,6 +100,7 @@ class SiluAndMul(nn.Module):
         params_dtype = layer_quant_config.quant_dtype
         self.quant_type = quant_type
         self.params_dtype = params_dtype
+        self.use_native_silu_and_mul = _uses_gfx1030_target()
 
     def forward_native(
         self, x: torch.Tensor, x_scale: Optional[torch.Tensor] = None
@@ -104,6 +131,8 @@ class SiluAndMul(nn.Module):
             and self.quant_type.value == QuantType.per_1x32.value
         ):
             return mxfp4_act_mul_quant_fuse(x, shuffle=True)
+        elif self.use_native_silu_and_mul:
+            return self.forward_native(x, x_scale)
         else:
             out = torch.empty(
                 [*x.shape[:-1], x.shape[-1] // 2], device=x.device, dtype=x.dtype

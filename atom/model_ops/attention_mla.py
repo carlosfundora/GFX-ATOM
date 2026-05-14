@@ -19,7 +19,10 @@ from aiter import (
 )
 from aiter.dist.parallel_state import get_dp_group
 from aiter.mla import mla_decode_fwd, mla_prefill_fwd
-from aiter.ops.triton.gather_kv_b_proj import gather_kv_b_proj
+try:
+    from aiter.ops.triton.gather_kv_b_proj import gather_kv_b_proj
+except ImportError:
+    gather_kv_b_proj = None
 from atom.config import get_current_atom_config
 from atom.model_ops.linear import use_triton_gemm
 from atom.model_ops.utils import get_and_maybe_dequant_weights
@@ -721,6 +724,11 @@ class MLAAttention(nn.Module):
                 )
 
             if use_prefix_cache:
+                if gather_kv_b_proj is None:
+                    raise RuntimeError(
+                        "AITER gather_kv_b_proj is required for MLA prefix-cache "
+                        "prefill but is not available in the active ROCm bridge."
+                    )
                 # k_full/v_full are used for attention compute; gather_kv_b_proj reads
                 # fp8 from cache and dequantizes internally, so output must be model dtype
                 k_full = torch.empty(

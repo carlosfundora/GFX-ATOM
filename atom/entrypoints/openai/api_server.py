@@ -16,6 +16,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import time
 import uuid
 from asyncio import AbstractEventLoop
@@ -24,12 +25,12 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import uvicorn
-from atom.model_engine.request import RequestOutput
-from atom.sampling_params import SamplingParams
 from atom.model_engine.arg_utils import EngineArgs
+from atom.model_engine.request import RequestOutput
 from atom.retrieval import ColbertService, is_colbert_model_spec
 from atom.retrieval.colbert import DEFAULT_MANIFEST_ROOT
-from fastapi import FastAPI, HTTPException, Request
+from atom.sampling_params import SamplingParams
+from fastapi import FastAPI, HTTPException, Request, UploadFile, WebSocket
 from fastapi.responses import JSONResponse, StreamingResponse
 from transformers import AutoTokenizer
 
@@ -57,13 +58,24 @@ from .serving_completion import (
     stream_completion_response,
     stream_completion_response_fanout,
 )
+from atom.audio.protocol import (
+    AudioSpeechRequest,
+    BatchSpeechRequest,
+    VoiceDeleteResponse,
+    VoiceUploadResponse,
+)
 
 # Configure logging
 logger = logging.getLogger("atom")
 
 # Constants
 DEFAULT_HOST = "0.0.0.0"
-DEFAULT_PORT = 8000
+DEFAULT_PORT = int(
+    os.environ.get(
+        "ATOM_OPENAI_SERVER_PORT",
+        os.environ.get("PORT_EMBED_POOL", "9299"),
+    )
+)
 
 
 # ============================================================================
@@ -73,8 +85,13 @@ DEFAULT_PORT = 8000
 engine = None
 tokenizer: Optional[AutoTokenizer] = None
 retrieval_service: Optional[ColbertService] = None
+speech_serving = None  # SpeechServing instance (if TTS enabled)
 model_name: str = ""
 allowed_model_names: set[str] = set()
+embedding_mode: bool = False
+embedding_pooling: str = "last"
+embedding_default_dimensions: Optional[int] = None
+embedding_allowed_dimensions: set[int] = set()
 default_chat_template_kwargs: Dict[str, Any] = {}
 _stream_queues: Dict[str, asyncio.Queue] = {}
 _seq_id_to_request_id: Dict[int, str] = {}
@@ -433,12 +450,20 @@ def _ensure_endpoint_supported(endpoint: str) -> None:
                 f"does not support '{endpoint}'."
             ),
         )
-    if retrieval_service is None and endpoint in {"embeddings", "rerank"}:
+    if retrieval_service is None and endpoint == "embeddings" and not embedding_mode:
         raise HTTPException(
             status_code=400,
             detail=(
                 f"Model '{model_name}' does not support '{endpoint}'. "
                 "Start ATOM with a ColBERT retrieval model to use these routes."
+            ),
+        )
+    if retrieval_service is None and endpoint == "rerank":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Model '{model_name}' does not support '{endpoint}'. "
+                "Start ATOM with a ColBERT retrieval model to use this route."
             ),
         )
 
@@ -814,30 +839,45 @@ async def completions(request: CompletionRequest):
 
 @app.post("/v1/embeddings")
 async def embeddings(request: EmbeddingRequest):
-    """Handle embedding requests for ColBERT feature extraction."""
-    global retrieval_service, model_name
+    """Handle embedding requests."""
+    global retrieval_service, model_name, engine
 
     _ensure_endpoint_supported("embeddings")
     validate_model(request.model)
-
-    if retrieval_service is None:
-        raise HTTPException(
-            status_code=400,
-            detail="No retrieval backend is configured for embeddings",
-        )
 
     texts = _normalize_embedding_inputs(request.input)
     if not texts:
         raise HTTPException(status_code=400, detail="input must not be empty")
 
     try:
-        embeddings_out, tokens_evaluated = retrieval_service.embed_texts(texts)
+        if retrieval_service is not None:
+            embeddings_out, tokens_evaluated = retrieval_service.embed_texts(texts)
+            response_model = model_name
+        else:
+            dimensions = request.dimensions or embedding_default_dimensions
+            if dimensions is not None:
+                if dimensions <= 0:
+                    raise ValueError("dimensions must be positive")
+                if (
+                    embedding_allowed_dimensions
+                    and dimensions not in embedding_allowed_dimensions
+                ):
+                    raise ValueError(
+                        f"dimensions={dimensions} is not supported; allowed dimensions: "
+                        f"{sorted(embedding_allowed_dimensions)}"
+                    )
+            embeddings_out, tokens_evaluated = engine.embed(
+                texts,
+                pooling=embedding_pooling,
+                dimensions=dimensions,
+            )
+            response_model = model_name
         data = [
             EmbeddingObject(index=index, embedding=embedding)
             for index, embedding in enumerate(embeddings_out)
         ]
         return EmbeddingResponse(
-            model=model_name,
+            model=response_model,
             data=data,
             usage={
                 "prompt_tokens": tokens_evaluated,
@@ -907,14 +947,102 @@ async def rerank(request: RerankRequest):
 @app.get("/v1/models")
 async def list_models():
     """List available models."""
-    global model_name
-    return ModelList(data=[ModelCard(id=model_name)])
+    global model_name, allowed_model_names
+    models = sorted(allowed_model_names or {model_name})
+    return ModelList(data=[ModelCard(id=item) for item in models])
 
 
 @app.get("/health")
 async def health():
     """Health check endpoint."""
     return {"status": "ok"}
+
+
+# ============================================================================
+# Speech API (OpenAI /v1/audio/speech compatible)
+# ============================================================================
+
+_TTS_NOT_ENABLED = "Speech API not enabled. Start with --tts-model, --fish-speech-model, or --voxcpm2-model."
+
+
+@app.post("/v1/audio/speech")
+async def create_speech(request: AudioSpeechRequest):
+    """Generate speech audio from text. Supports Chatterbox, Fish Speech, VoxCPM2."""
+    if speech_serving is None:
+        raise HTTPException(status_code=404, detail=_TTS_NOT_ENABLED)
+    return await speech_serving.create_speech(request)
+
+
+@app.post("/v1/audio/speech/batch")
+async def create_speech_batch(request: BatchSpeechRequest):
+    """Batch speech synthesis with per-item overrides."""
+    if speech_serving is None:
+        raise HTTPException(status_code=404, detail=_TTS_NOT_ENABLED)
+    result = await speech_serving.create_speech_batch(request)
+    return result.model_dump()
+
+
+@app.get("/v1/audio/voices")
+async def list_voices():
+    """List available TTS voices (built-in + uploaded + engine-specific)."""
+    if speech_serving is None:
+        raise HTTPException(status_code=404, detail=_TTS_NOT_ENABLED)
+    result = await speech_serving.list_voices()
+    return result.model_dump()
+
+
+@app.post("/v1/audio/voices")
+async def upload_voice(
+    audio_file: UploadFile,
+    consent: str = "agree",
+    name: str = "uploaded",
+    ref_text: str | None = None,
+    speaker_description: str | None = None,
+):
+    """Upload a reference voice sample for voice cloning."""
+    if speech_serving is None:
+        raise HTTPException(status_code=404, detail=_TTS_NOT_ENABLED)
+    try:
+        result = await speech_serving.upload_voice(
+            audio_file=audio_file,
+            consent=consent,
+            name=name,
+            ref_text=ref_text,
+            speaker_description=speaker_description,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/v1/audio/voices/{name}")
+async def delete_voice(name: str):
+    """Delete an uploaded voice sample."""
+    if speech_serving is None:
+        raise HTTPException(status_code=404, detail=_TTS_NOT_ENABLED)
+    deleted = await speech_serving.delete_voice(name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Voice '{name}' not found")
+    return VoiceDeleteResponse(name=name).model_dump()
+
+
+@app.websocket("/v1/audio/speech/stream")
+async def speech_stream_ws(websocket: WebSocket):
+    """WebSocket endpoint for streaming text-input TTS.
+
+    Protocol:
+        Client → {"type": "session.config", ...}
+        Client → {"type": "input.text", "text": "..."}
+        Client → {"type": "input.done"}
+        Server → {"type": "audio.start", ...} + binary audio + {"type": "audio.done", ...}
+        Server → {"type": "session.done", "total_sentences": N}
+    """
+    if speech_serving is None:
+        await websocket.close(code=1008, reason=_TTS_NOT_ENABLED)
+        return
+    from atom.entrypoints.openai.serving_speech_stream import StreamingSpeechHandler
+    handler = StreamingSpeechHandler(speech_serving)
+    await handler.handle(websocket)
 
 
 @app.post("/start_profile")
@@ -957,6 +1085,8 @@ def main():
     """Main entry point for the server."""
     global engine, tokenizer, retrieval_service, model_name, allowed_model_names
     global default_chat_template_kwargs, _request_logger
+    global embedding_mode, embedding_pooling, embedding_default_dimensions
+    global embedding_allowed_dimensions
 
     parser = argparse.ArgumentParser(description="ATOM OpenAI API Server")
     EngineArgs.add_cli_args(parser)
@@ -995,6 +1125,80 @@ def main():
         default=None,
         help="Optional torch device override for ColBERT inference (default: cpu).",
     )
+    parser.add_argument(
+        "--embedding-mode",
+        action="store_true",
+        help="Serve /v1/embeddings from ATOM transformer hidden states.",
+    )
+    parser.add_argument(
+        "--embedding-pooling",
+        choices=["last", "mean"],
+        default="last",
+        help="Pooling mode for ATOM dense embeddings.",
+    )
+    parser.add_argument(
+        "--embedding-default-dimensions",
+        type=int,
+        default=None,
+        help="Default dense embedding dimensions when requests omit dimensions.",
+    )
+    parser.add_argument(
+        "--embedding-dimensions",
+        type=str,
+        default="",
+        help="Comma-separated list of allowed dense Matryoshka dimensions.",
+    )
+    parser.add_argument(
+        "--model-alias",
+        action="append",
+        default=[],
+        help="Additional accepted model id. Can be supplied multiple times.",
+    )
+    # TTS / Speech API arguments
+    parser.add_argument(
+        "--tts-model",
+        type=str,
+        default=None,
+        help="Path to Chatterbox ONNX model directory to enable /v1/audio/speech.",
+    )
+    parser.add_argument(
+        "--tts-backbone",
+        type=str,
+        default=None,
+        help="Path to HF backbone model for GPU-accelerated TTS. If omitted, uses ONNX CPU.",
+    )
+    parser.add_argument(
+        "--tts-variant",
+        choices=["standard", "turbo"],
+        default="standard",
+        help="Chatterbox variant: standard (Llama 0.5B) or turbo (GPT2 350M).",
+    )
+    parser.add_argument(
+        "--tts-device",
+        type=str,
+        default="cuda:0",
+        help="GPU device for TTS backbone model.",
+    )
+    parser.add_argument(
+        "--tts-dtype",
+        choices=["float16", "bfloat16", "float32"],
+        default="float16",
+        help="Model dtype for TTS backbone.",
+    )
+    parser.add_argument(
+        "--fish-speech-model",
+        type=str,
+        default=None,
+        help="Path to Fish Speech S2 Pro model directory (fishaudio/s2-pro). "
+        "Enables Fish Speech engine for /v1/audio/speech.",
+    )
+    parser.add_argument(
+        "--voxcpm2-model",
+        type=str,
+        default=None,
+        help="Path to VoxCPM2 model directory (openbmb/VoxCPM2). "
+        "Enables VoxCPM2 engine for /v1/audio/speech.",
+    )
     args = parser.parse_args()
 
     if args.request_log:
@@ -1011,7 +1215,9 @@ def main():
         logger.info(f"Default chat template kwargs: {default_chat_template_kwargs}")
 
     colbert_manifest_root = Path(args.colbert_manifest_root)
-    if is_colbert_model_spec(args.model, manifest_root=colbert_manifest_root):
+    if not args.embedding_mode and is_colbert_model_spec(
+        args.model, manifest_root=colbert_manifest_root
+    ):
         logger.info(f"Initializing ColBERT retrieval backend with model {args.model}...")
         retrieval_service = ColbertService.from_model(
             args.model,
@@ -1029,14 +1235,98 @@ def main():
     else:
         from atom.model_engine.llm_engine import _load_tokenizer
 
+        embedding_mode = bool(args.embedding_mode)
+        embedding_pooling = args.embedding_pooling
+        embedding_default_dimensions = args.embedding_default_dimensions
+        embedding_allowed_dimensions = {
+            int(item.strip())
+            for item in args.embedding_dimensions.split(",")
+            if item.strip()
+        }
+
         logger.info(f"Loading tokenizer from {args.model}...")
         tokenizer = _load_tokenizer(args.model, args.trust_remote_code)
         model_name = args.model
-        allowed_model_names = {model_name}
+        allowed_model_names = {model_name, *args.model_alias}
 
         logger.info(f"Initializing engine with model {args.model}...")
         engine_args = EngineArgs.from_cli_args(args)
         engine = engine_args.create_engine(tokenizer=tokenizer)
+
+    # Initialize TTS engines (multi-model support)
+    global speech_serving
+    _any_tts = args.tts_model or args.fish_speech_model or args.voxcpm2_model
+    if _any_tts:
+        from atom.entrypoints.openai.serving_speech import SpeechServing
+
+        speech_serving = SpeechServing()
+        _tts_engines_loaded = []
+
+        # Chatterbox TTS
+        if args.tts_model:
+            from atom.audio.chatterbox.engine import ChatterboxEngine
+
+            logger.info(
+                "Initializing Chatterbox TTS (%s) from %s...",
+                args.tts_variant, args.tts_model,
+            )
+            chatterbox_engine = ChatterboxEngine(
+                model_dir=args.tts_model,
+                backbone_dir=args.tts_backbone,
+                variant=args.tts_variant,
+                device=args.tts_device,
+                dtype=args.tts_dtype,
+            )
+            chatterbox_engine.load()
+            speech_serving.register_engine(
+                "chatterbox", chatterbox_engine, default=True,
+            )
+            _tts_engines_loaded.append("chatterbox")
+
+        # Fish Speech S2 Pro
+        if args.fish_speech_model:
+            from atom.models.fish_speech.engine import FishSpeechEngine
+
+            logger.info(
+                "Initializing Fish Speech S2 Pro from %s...",
+                args.fish_speech_model,
+            )
+            fish_engine = FishSpeechEngine(
+                model_dir=args.fish_speech_model,
+                device=args.tts_device,
+                dtype=args.tts_dtype,
+            )
+            fish_engine.load()
+            speech_serving.register_engine(
+                "fish_speech", fish_engine,
+                default=not _tts_engines_loaded,
+            )
+            _tts_engines_loaded.append("fish_speech")
+
+        # VoxCPM2
+        if args.voxcpm2_model:
+            from atom.models.voxcpm2.engine import VoxCPM2Engine
+
+            logger.info(
+                "Initializing VoxCPM2 from %s...",
+                args.voxcpm2_model,
+            )
+            voxcpm2_engine = VoxCPM2Engine(
+                model_dir=args.voxcpm2_model,
+                device=args.tts_device,
+                dtype=args.tts_dtype,
+            )
+            voxcpm2_engine.load()
+            speech_serving.register_engine(
+                "voxcpm2", voxcpm2_engine,
+                default=not _tts_engines_loaded,
+            )
+            _tts_engines_loaded.append("voxcpm2")
+
+        logger.info(
+            "Speech API enabled at /v1/audio/speech with engines: %s",
+            ", ".join(_tts_engines_loaded),
+        )
 
     import signal
 

@@ -15,6 +15,7 @@ Supported operations:
   - RoPE positional encoding (NeoX and GPT-J styles)
   - Fused QKNorm + RoPE (for Qwen3, Gemma 4, DeepSeek-V3)
   - Activation functions (SiLU, GELU)
+  - Snake activation (SnakeBeta — fused Triton for TTS audio decoders)
 """
 
 import logging

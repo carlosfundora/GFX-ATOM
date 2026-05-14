@@ -47,7 +47,7 @@ from atom.utils.decorators import support_torch_compile
 from torch import nn
 from transformers import Qwen3Config
 
-from atom.model_loader.loader import load_model_in_plugin_mode
+from atom.model_loader.loader import WeightsMapper, load_model_in_plugin_mode
 from atom.models.utils import maybe_prefix
 
 
@@ -129,8 +129,12 @@ class Qwen3Attention(nn.Module):
         qkv = self.qkv_proj(hidden_states)
         q, k, v = torch.split(qkv, [self.q_size, self.kv_size, self.kv_size], dim=-1)
 
-        q = self.q_norm(q)
-        k = self.k_norm(k)
+        q = self.q_norm(q.view(-1, self.num_heads, self.head_dim)).view(
+            -1, self.num_heads * self.head_dim
+        )
+        k = self.k_norm(k.view(-1, self.num_kv_heads, self.head_dim)).view(
+            -1, self.num_kv_heads * self.head_dim
+        )
 
         o = self.attn(q, k, v, positions, **model_kwargs)
         output = self.o_proj(o)
@@ -281,6 +285,14 @@ class Qwen3Model(nn.Module):
 
 
 class Qwen3ForCausalLM(nn.Module):
+    weights_mapper = WeightsMapper(
+        orig_to_new_prefix={
+            "embed_tokens.": "model.embed_tokens.",
+            "layers.": "model.layers.",
+            "norm.": "model.norm.",
+        },
+    )
+
     packed_modules_mapping = {
         "q_proj": ("qkv_proj", "q"),
         "k_proj": ("qkv_proj", "k"),
@@ -328,11 +340,9 @@ class Qwen3ForCausalLM(nn.Module):
 
     def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:
         # load weights in plugin mode and discard passed weights generator
-        # here prefix is "model." because Qwen3ForCausalLM is constructed in model
-        # wrapper class, so the name of loaded weights are prefixed with "model.".
-        # The vLLM will check the name of the loaded weights to make sure all the
-        # weights are loaded correctly
         loaded_weights_record = load_model_in_plugin_mode(
-            model=self, config=self.atom_config, prefix="model."
+            model=self,
+            config=self.atom_config,
+            weights_mapper=self.weights_mapper,
         )
         return loaded_weights_record

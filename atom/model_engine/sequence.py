@@ -47,6 +47,9 @@ class Sequence:
         needs_independent_noise: bool = False,
         parent_request_id: Optional[str] = None,
         sibling_index: int = 0,
+        is_embedding_request: bool = False,
+        embedding_pooling: str = "last",
+        embedding_dimensions: Optional[int] = None,
     ):
         self.block_size = block_size
         self.id = id or next(Sequence.counter)
@@ -108,6 +111,10 @@ class Sequence:
         # to safe values for single-sample requests.
         self.parent_request_id = parent_request_id
         self.sibling_index = sibling_index
+        self.is_embedding_request = is_embedding_request
+        self.embedding_pooling = embedding_pooling
+        self.embedding_dimensions = embedding_dimensions
+        self.embedding: Optional[list[float]] = None
 
     def __len__(self):
         return self._num_tokens

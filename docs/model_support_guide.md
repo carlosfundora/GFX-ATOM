@@ -1,5 +1,8 @@
 # ATOM Model Support Guide
 
+**Retrieval-only models:** `Lfm2Model`-based ColBERT checkpoints are not loaded through `ModelRunner`. They are routed through the dedicated `atom.retrieval.colbert.ColbertService`, which powers `/v1/embeddings` and `/v1/rerank` using the local registry metadata plus the CPU HF model files.
+
+
 ATOM (AiTer Optimized Model) is AMD's lightweight LLM inference engine built on AITER kernels for ROCm/HIP GPUs. This guide covers the supported model architectures, weight loading, and how to add new models.
 
 ## Quick Reference

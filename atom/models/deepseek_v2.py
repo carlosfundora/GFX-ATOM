@@ -1047,7 +1047,6 @@ def sparse_attn_indexer(
         padded_q_fp8_decode_tokens = q_fp8[:num_decode_tokens].reshape(
             context.batch_size, -1, *q_fp8.shape[1:]
         )
-        # TODO: move and optimize below logic with triton kernels
         batch_size = padded_q_fp8_decode_tokens.shape[0]
         next_n = padded_q_fp8_decode_tokens.shape[1]
         assert batch_size == context.batch_size
@@ -1165,13 +1164,12 @@ class Indexer(nn.Module):
 
         self.scale_fmt = "ue8m0"
         self.quant_func = get_hip_quant(QuantType.per_1x128)
-        self.quant_block_size = 128  # TODO: get from config
+        self.quant_block_size = getattr(config, "quant_block_size", 128)
         self.topk_indices_buffer = topk_indices_buffer
 
-        # TODO (zyongye) change dim to fp8 later to (self.head_dim + 4)
         self.k_cache = DeepseekV32IndexerCache(
             head_dim=self.head_dim + 4,
-            dtype=torch.uint8,
+            dtype=torch.float8_e4m3fn,
             prefix=f"{prefix}.k_cache",
             cache_config=cache_config,
         )

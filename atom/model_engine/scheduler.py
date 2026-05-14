@@ -263,6 +263,15 @@ class ScheduledBatch:
             [getattr(seq, "needs_independent_noise", False) for seq in seqs.values()],
             dtype=bool,
         )
+        self.is_embedding_batch = bool(seqs) and all(
+            getattr(seq, "is_embedding_request", False) for seq in seqs.values()
+        )
+        self.embedding_pooling = [
+            getattr(seq, "embedding_pooling", "last") for seq in seqs.values()
+        ]
+        self.embedding_dimensions = [
+            getattr(seq, "embedding_dimensions", None) for seq in seqs.values()
+        ]
 
         self.is_first_decode_without_local_prefill = [
             seq.is_first_decode for seq in seqs.values()
@@ -331,6 +340,7 @@ class ScheduledBatchOutput:
         num_bonus: Optional[np.ndarray],
         draft_token_ids: Optional[np.ndarray],
         is_deferred_out: bool = False,
+        embeddings: Optional[list[list[float]]] = None,
     ):
         self.req_ids = req_ids
         self.token_ids = token_ids
@@ -338,6 +348,7 @@ class ScheduledBatchOutput:
         self.num_rejected = num_rejected
         self.num_bonus = num_bonus
         self.is_deferred_out = is_deferred_out
+        self.embeddings = embeddings
         self._req_id_to_idx: Optional[dict[int, int]] = None
 
     def get_idx(self, req_id: int) -> Optional[int]:
@@ -653,6 +664,26 @@ class Scheduler:
         stream_output_queue=None,
     ) -> list[Sequence]:
         """Process model outputs: update tokens, check stop conditions, free blocks."""
+        if fwd_output.embeddings is not None:
+            finished_seqs = []
+            for seq in list(self.running):
+                idx = fwd_output.get_idx(seq.id)
+                if idx is None:
+                    continue
+                seq.embedding = fwd_output.embeddings[idx]
+                seq.leave_reason = "embedding"
+                seq.status = SequenceStatus.FINISHED
+                seq.leave_time = time.time()
+                finished_seqs.append(seq)
+
+            for seq in finished_seqs:
+                logger.debug("Freeing blocks for finished embedding seq %s", seq.id)
+                if self.kv_connector is not None:
+                    self.kv_connector.request_finished(seq)
+                self.block_manager.deallocate(seq)
+                self.running.remove(seq)
+            return finished_seqs
+
         prev_token_ids = fwd_output.token_ids
         draft_token_ids = fwd_output.draft_token_ids
         is_deferred_out = fwd_output.is_deferred_out

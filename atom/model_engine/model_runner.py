@@ -52,6 +52,7 @@ logger = logging.getLogger("atom")
 
 support_model_arch_dict = {
     "Qwen3ForCausalLM": "atom.models.qwen3.Qwen3ForCausalLM",
+    "Qwen2ForCausalLM": "atom.models.qwen2.Qwen2ForCausalLM",
     "Qwen3MoeForCausalLM": "atom.models.qwen3_moe.Qwen3MoeForCausalLM",
     "LlamaForCausalLM": "atom.models.llama.LlamaForCausalLM",
     "MixtralForCausalLM": "atom.models.mixtral.MixtralForCausalLM",
@@ -67,6 +68,7 @@ support_model_arch_dict = {
     "KimiK25ForConditionalGeneration": "atom.models.kimi_k25.KimiK25ForCausalLM",
     "MiniMaxM2ForCausalLM": "atom.models.minimax_m2.MiniMaxM2ForCausalLM",
     "MiMoV2FlashForCausalLM": "atom.models.mimo_v2_flash.MiMoV2FlashForCausalLM",
+    "GPT2LMHeadModel": "atom.models.gpt2.GPT2LMHeadModel",
 }
 # seed = 34567
 # np.random.seed(seed)
@@ -397,7 +399,33 @@ class tokenIDProcessor:
                         and self.pre_num_decode_token_per_seq > 1
                     ):
                         # draft_token_ids is 2D (num_seqs, mtp_n_grams-1), use direct indexing
-                        gathered_draft = self.draft_token_ids[deferred_indices_gpu]
+                        # RDNA2 (gfx1030) HIP crash workaround: advanced tensor
+                        # indexing with GPU index tensors can trigger
+                        # AcceleratorError / unspecified launch failure on RDNA2.
+                        # Fall back to CPU-side index_select when HIP fails.
+                        try:
+                            gathered_draft = self.draft_token_ids[deferred_indices_gpu]
+                        except Exception as _hip_err:
+                            _err = str(_hip_err).lower()
+                            if 'hip' in _err or 'acceleratorerror' in _err or 'unspecified launch failure' in _err:
+                                logger.warning(
+                                    "HIP indexing failure in draft token gathering; "
+                                    "falling back to CPU index_select "
+                                    "(draft_token_ids: shape=%s, strides=%s, "
+                                    "indices: shape=%s, dtype=%s)",
+                                    tuple(self.draft_token_ids.shape),
+                                    self.draft_token_ids.stride(),
+                                    tuple(deferred_indices_gpu.shape),
+                                    deferred_indices_gpu.dtype,
+                                )
+                                cpu_idx = deferred_indices_gpu.to("cpu", non_blocking=True)
+                                cpu_draft = self.draft_token_ids.detach().to("cpu", non_blocking=True)
+                                gathered_cpu = cpu_draft.index_select(0, cpu_idx.flatten())
+                                gathered_draft = gathered_cpu.to(
+                                    self.draft_token_ids.device, non_blocking=True
+                                )
+                            else:
+                                raise
                         gathered_tokens = torch.cat(
                             [
                                 gathered_prev.unsqueeze(1),  # (num_deferred_seqs, 1)
@@ -1752,6 +1780,41 @@ class ModelRunner:
         hidden_states: torch.Tensor,
         needs_independent_noise: bool = False,
     ) -> ScheduledBatchOutput:
+        if getattr(batch, "is_embedding_batch", False):
+            embeddings: list[list[float]] = []
+            offset = 0
+            for num_tokens, pooling, dimensions in zip(
+                batch.num_scheduled_tokens,
+                batch.embedding_pooling,
+                batch.embedding_dimensions,
+            ):
+                next_offset = offset + int(num_tokens)
+                seq_hidden = hidden_states[offset:next_offset]
+                if seq_hidden.numel() == 0:
+                    raise ValueError("Cannot embed an empty token sequence")
+                if pooling == "mean":
+                    pooled = seq_hidden.float().mean(dim=0)
+                elif pooling == "last":
+                    pooled = seq_hidden[-1].float()
+                else:
+                    raise ValueError(f"Unsupported embedding pooling mode: {pooling}")
+                if dimensions is not None:
+                    pooled = pooled[: int(dimensions)]
+                pooled = torch.nn.functional.normalize(pooled, p=2, dim=0)
+                embeddings.append(pooled.detach().cpu().tolist())
+                offset = next_offset
+            self.forward_done_event.record()
+            self.forward_done_event.synchronize()
+            return ScheduledBatchOutput(
+                req_ids=batch.req_ids,
+                token_ids=[tuple() for _ in batch.req_ids],
+                draft_token_ids=None,
+                is_deferred_out=False,
+                num_rejected=np.zeros(batch.total_seqs_num, dtype=np.int32),
+                num_bonus=np.zeros(batch.total_seqs_num, dtype=np.int32),
+                embeddings=embeddings,
+            )
+
         spec_decode_metadata = get_forward_context().spec_decode_metadata
         bs = batch.total_seqs_num
         if spec_decode_metadata is None:
