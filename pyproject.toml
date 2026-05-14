@@ -26,6 +26,12 @@ fallback_version = "0.1.0"
 where = ["."]
 include = ["atom*"]
 
+[dependency-groups]
+dev = [
+    "setuptools-rust>=1.12.1",
+    "setuptools-scm[toml]>=6.2",
+]
+
 [project.entry-points."vllm.platform_plugins"]
 # by default the entry-points will be installed anyway
 # but the plugin mode for platforms can be disabled by 
