@@ -1082,7 +1082,7 @@ async def speech_stream_ws(websocket: WebSocket):
         return
     from atom.entrypoints.openai.serving_speech_stream import StreamingSpeechHandler
     handler = StreamingSpeechHandler(speech_serving)
-    await handler.handle(websocket)
+    await handler.handle_session(websocket)
 
 
 @app.post("/start_profile")
