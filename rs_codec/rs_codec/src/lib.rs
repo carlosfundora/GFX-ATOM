@@ -911,6 +911,161 @@ fn rrf_accumulate(
     Ok(scores)
 }
 
+// ---------------------------------------------------------------------------
+// PCM bytes ↔ audio (from rs_audio_core)
+// ---------------------------------------------------------------------------
+
+#[pyfunction]
+fn pcm_bytes_to_audio(py: Python, pcm: &[u8]) -> Py<PyAny> {
+    let mut audio = Vec::with_capacity(pcm.len() / 2);
+    for chunk in pcm.chunks_exact(2) {
+        let val = i16::from_le_bytes([chunk[0], chunk[1]]);
+        audio.push(val as f32 / 32767.0);
+    }
+    Array1::from_vec(audio).into_pyarray(py).into_any().unbind()
+}
+
+// ---------------------------------------------------------------------------
+// Levenshtein distance — edit distance with early termination (from rs_audio_core)
+// ---------------------------------------------------------------------------
+
+fn levenshtein_distance_impl(a: &str, b: &str, max_dist: isize) -> isize {
+    if a == b {
+        return 0;
+    }
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let (a_vec, b_vec) = if a_chars.len() < b_chars.len() {
+        (b_chars, a_chars)
+    } else {
+        (a_chars, b_chars)
+    };
+    if b_vec.is_empty() {
+        return a_vec.len() as isize;
+    }
+    let mut prefix_len = 0;
+    while prefix_len < b_vec.len() && a_vec[prefix_len] == b_vec[prefix_len] {
+        prefix_len += 1;
+    }
+    let a_sliced = &a_vec[prefix_len..];
+    let b_sliced_full = &b_vec[prefix_len..];
+    if b_sliced_full.is_empty() {
+        return a_sliced.len() as isize;
+    }
+    let mut a_len = a_sliced.len();
+    let mut b_len = b_sliced_full.len();
+    while b_len > 0 && a_sliced[a_len - 1] == b_sliced_full[b_len - 1] {
+        a_len -= 1;
+        b_len -= 1;
+    }
+    let a_sliced = &a_sliced[..a_len];
+    let b_sliced = &b_sliced_full[..b_len];
+    if b_len == 0 {
+        return a_len as isize;
+    }
+    if max_dist > -1 && (a_len as isize - b_len as isize).abs() > max_dist {
+        return max_dist + 1;
+    }
+    let mut previous_row: Vec<isize> = (0..=b_len as isize).collect();
+    let mut current_row: Vec<isize> = vec![0; b_len + 1];
+    for (i, c1) in a_sliced.iter().enumerate() {
+        current_row[0] = (i + 1) as isize;
+        let mut min_current = current_row[0];
+        for (j, c2) in b_sliced.iter().enumerate() {
+            let val = if c1 == c2 {
+                previous_row[j]
+            } else {
+                let min_val = previous_row[j]
+                    .min(current_row[j])
+                    .min(previous_row[j + 1]);
+                min_val + 1
+            };
+            current_row[j + 1] = val;
+            if val < min_current {
+                min_current = val;
+            }
+        }
+        if max_dist > -1 && min_current > max_dist {
+            return max_dist + 1;
+        }
+        std::mem::swap(&mut previous_row, &mut current_row);
+    }
+    previous_row[b_len]
+}
+
+#[pyfunction]
+#[pyo3(signature = (a, b, max_dist=-1))]
+fn levenshtein_distance(a: &str, b: &str, max_dist: isize) -> isize {
+    levenshtein_distance_impl(a, b, max_dist)
+}
+
+#[pyfunction]
+fn levenshtein_ratio(a: &str, b: &str) -> f64 {
+    if a == b {
+        return 1.0;
+    }
+    let dist = levenshtein_distance_impl(a, b, -1);
+    let len_a = a.chars().count();
+    let len_b = b.chars().count();
+    let max_len = len_a.max(len_b);
+    if max_len == 0 {
+        return 1.0;
+    }
+    (max_len as f64 - dist as f64) / max_len as f64
+}
+
+// ---------------------------------------------------------------------------
+// Temporal decay — batch variants (from rs_scoring)
+// ---------------------------------------------------------------------------
+
+#[pyfunction]
+fn temporal_decay_batch(
+    timestamps: Vec<f64>,
+    now: f64,
+    half_life_days: f64,
+    method: &str,
+) -> PyResult<Vec<f64>> {
+    if half_life_days <= 0.0 {
+        return Err(PyValueError::new_err("half_life_days must be > 0"));
+    }
+    let mut out = Vec::with_capacity(timestamps.len());
+    for ts in timestamps {
+        let age_seconds = now - ts;
+        let score = if age_seconds <= 0.0 {
+            1.0
+        } else {
+            let age_days = age_seconds / 86_400.0;
+            match method {
+                "quadratic" => 1.0 / (1.0 + (age_days / half_life_days).powi(2)),
+                "exponential" => (-age_days / half_life_days).exp(),
+                _ => return Err(PyValueError::new_err(format!(
+                    "Unknown decay method {method:?}; expected 'quadratic' or 'exponential'"
+                ))),
+            }
+        };
+        out.push(score);
+    }
+    Ok(out)
+}
+
+#[pyfunction]
+fn batch_decay_scores(
+    items: Vec<HashMap<String, f64>>,
+    timestamp_key: &str,
+    now: f64,
+    half_life_days: f64,
+    method: &str,
+) -> PyResult<Vec<f64>> {
+    let mut timestamps = Vec::with_capacity(items.len());
+    for item in &items {
+        let ts = item.get(timestamp_key).ok_or_else(|| {
+            PyValueError::new_err(format!("missing timestamp key {timestamp_key:?}"))
+        })?;
+        timestamps.push(*ts);
+    }
+    temporal_decay_batch(timestamps, now, half_life_days, method)
+}
+
 // ===========================================================================
 // Module registration
 // ===========================================================================
@@ -923,6 +1078,7 @@ fn rs_codec(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(encode_wav_b64, m)?)?;
     m.add_function(wrap_pyfunction!(float_to_int16_bytes, m)?)?;
     m.add_function(wrap_pyfunction!(crossfade_chunks, m)?)?;
+    m.add_function(wrap_pyfunction!(pcm_bytes_to_audio, m)?)?;
     // DSP kernels
     m.add_function(wrap_pyfunction!(soft_compressor, m)?)?;
     m.add_function(wrap_pyfunction!(agc_kernel, m)?)?;
@@ -930,8 +1086,10 @@ fn rs_codec(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(highpass_kernel, m)?)?;
     m.add_function(wrap_pyfunction!(fused_preprocess_for_vad_f32, m)?)?;
     m.add_function(wrap_pyfunction!(compute_rms, m)?)?;
-    // Sentence splitting
+    // Sentence splitting & text matching
     m.add_class::<SentenceSplitter>()?;
+    m.add_function(wrap_pyfunction!(levenshtein_distance, m)?)?;
+    m.add_function(wrap_pyfunction!(levenshtein_ratio, m)?)?;
     // Quantization & similarity
     m.add_function(wrap_pyfunction!(hamming_q1_blocks, m)?)?;
     m.add_function(wrap_pyfunction!(q1_batch_hamming_topk, m)?)?;
@@ -949,6 +1107,8 @@ fn rs_codec(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(smooth_vector, m)?)?;
     m.add_function(wrap_pyfunction!(compute_momentum, m)?)?;
     m.add_function(wrap_pyfunction!(temporal_decay_score, m)?)?;
+    m.add_function(wrap_pyfunction!(temporal_decay_batch, m)?)?;
+    m.add_function(wrap_pyfunction!(batch_decay_scores, m)?)?;
     m.add_function(wrap_pyfunction!(combined_retrieval_score_batch, m)?)?;
     m.add_function(wrap_pyfunction!(rrf_accumulate, m)?)?;
     Ok(())
