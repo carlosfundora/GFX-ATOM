@@ -145,6 +145,7 @@ async def async_request_trt_llm(
         ttft = 0.0
         st = time.perf_counter()
         most_recent_timestamp = st
+        generated_text_chunks = []
         try:
             async with session.post(url=api_url, json=payload) as response:
                 if response.status == 200:
@@ -156,7 +157,7 @@ async def async_request_trt_llm(
                         chunk = chunk_bytes.decode("utf-8").removeprefix("data:")
 
                         data = json.loads(chunk)
-                        output.generated_text += data["text_output"]
+                        generated_text_chunks.append(data["text_output"])
                         timestamp = time.perf_counter()
                         # First token
                         if ttft == 0.0:
@@ -169,6 +170,7 @@ async def async_request_trt_llm(
 
                         most_recent_timestamp = timestamp
 
+                    output.generated_text = "".join(generated_text_chunks)
                     output.latency = most_recent_timestamp - st
                     output.success = True
 
@@ -268,7 +270,7 @@ async def async_request_openai_completions(
         output = RequestFuncOutput()
         output.prompt_len = request_func_input.prompt_len
 
-        generated_text = ""
+        generated_text_chunks = []
         st = time.perf_counter()
         most_recent_timestamp = st
         try:
@@ -305,7 +307,7 @@ async def async_request_openai_completions(
                                     output.itl.append(timestamp - most_recent_timestamp)
 
                                 most_recent_timestamp = timestamp
-                                generated_text += text or ""
+                                generated_text_chunks.append(text or "")
                             elif usage := data.get("usage"):
                                 output.output_tokens = usage.get("completion_tokens")
                     if first_chunk_received:
@@ -316,7 +318,7 @@ async def async_request_openai_completions(
                             "Never received a valid chunk to calculate TTFT."
                             "This response will be marked as failed!"
                         )
-                    output.generated_text = generated_text
+                    output.generated_text = "".join(generated_text_chunks)
                     output.latency = most_recent_timestamp - st
                 else:
                     output.error = response.reason or ""
@@ -374,7 +376,7 @@ async def async_request_openai_chat_completions(
         output = RequestFuncOutput()
         output.prompt_len = request_func_input.prompt_len
 
-        generated_text = ""
+        generated_text_chunks = []
         ttft = 0.0
         st = time.perf_counter()
         most_recent_timestamp = st
@@ -404,13 +406,13 @@ async def async_request_openai_chat_completions(
                                 else:
                                     output.itl.append(timestamp - most_recent_timestamp)
 
-                                generated_text += content or ""
+                                generated_text_chunks.append(content or "")
                             elif usage := data.get("usage"):
                                 output.output_tokens = usage.get("completion_tokens")
 
                             most_recent_timestamp = timestamp
 
-                    output.generated_text = generated_text
+                    output.generated_text = "".join(generated_text_chunks)
                     output.success = True
                     output.latency = most_recent_timestamp - st
                 else:
