@@ -19,6 +19,12 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+try:
+    import rs_codec
+    _HAS_RS_CODEC = True
+except ImportError:
+    _HAS_RS_CODEC = False
+
 from atom.audio.chatterbox.onnx_artifacts import resolve_component_path
 from atom.audio.chatterbox.service import (
     SAMPLE_RATE,
@@ -200,15 +206,12 @@ class ChatterboxEngine:
         
         # 5. Apply AGC and Soft Compression (CPU via Rust)
         t4 = time.time()
-        try:
-            import rs_codec
+        if _HAS_RS_CODEC:
             # target_rms=-18dBFS ~ 0.125.
             # Apply soft compression first to tame peaks
             wav, _ = rs_codec.soft_compressor(wav, 0.5, 4.0, 0.01, 0.1, 1.0)
             # Apply AGC to level out everything to -18dBFS
             wav, _ = rs_codec.agc_kernel(wav, 0.125, 0.01, 0.1, 10.0, 2400, 1.0)
-        except ImportError:
-            pass # Fallback if rs_codec not installed
         metrics["postprocess_sec"] = time.time() - t4
 
         metrics["audio_duration"] = len(wav) / SAMPLE_RATE
@@ -237,6 +240,8 @@ class ChatterboxEngine:
         past_key_values = None
 
         next_token = None
+        # Hoist embedder resolution outside the loop
+        embedder = self._model.get_input_embeddings()
         for i in range(max_tokens):
             if i == 0:
                 outputs = self._model(
@@ -246,7 +251,7 @@ class ChatterboxEngine:
                 )
             else:
                 # Embed single token
-                token_embeds = self._model.get_input_embeddings()(next_token)
+                token_embeds = embedder(next_token)
                 outputs = self._model(
                     inputs_embeds=token_embeds,
                     past_key_values=past_key_values,
