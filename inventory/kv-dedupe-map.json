@@ -97,7 +97,7 @@
           "kind": "serving_baseline"
         },
         {
-          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/llm-compressor",
+          "path": "/home/local/ai/projects/.archived/repos/llm-compressor",
           "kind": "quant_tooling"
         },
         {
@@ -105,7 +105,7 @@
           "kind": "benchmark_baseline"
         },
         {
-          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/quant.cpp",
+          "path": "/home/local/ai/projects/.archived/repos/quant.cpp",
           "kind": "runtime_baseline"
         },
         {
@@ -113,7 +113,7 @@
           "kind": "ffi_baseline"
         },
         {
-          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/rvllm",
+          "path": "/home/local/ai/projects/.archived/repos/rvllm",
           "kind": "runtime_baseline"
         }
       ],
@@ -128,19 +128,19 @@
           "kind": "policy_family"
         },
         {
-          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/R-KV",
+          "path": "/home/local/ai/projects/.archived/repos/R-KV",
           "kind": "compression_cluster"
         },
         {
-          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/tair-kvcache",
+          "path": "/home/local/ai/projects/.archived/repos/tair-kvcache",
           "kind": "distributed_cache"
         },
         {
-          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/sardeenz",
+          "path": "/home/local/ai/projects/.archived/repos/sardeenz",
           "kind": "multi_model_packing"
         },
         {
-          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/llama-swap",
+          "path": "/home/local/ai/projects/.archived/repos/llama-swap",
           "kind": "routing_gateway"
         },
         {
