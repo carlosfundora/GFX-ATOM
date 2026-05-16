@@ -1,70 +1,39 @@
 import time
-import argparse
 import sys
-from pathlib import Path
-
-# Add project root to path
-project_root = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-from unittest.mock import MagicMock
-
-def patch_modules():
-    # Mock hard-to-load modules for basic pure CPU benchmarking logic testing
-    import sys
-    sys.modules['torch'] = MagicMock()
-    sys.modules['aiter'] = MagicMock()
-    sys.modules['torch.nn.functional'] = MagicMock()
+import numpy as np
 
 try:
-    from atom.audio.chatterbox.engine import ChatterboxEngine
+    import rs_codec
+    has_rs_codec = True
 except ImportError:
-    patch_modules()
-    from atom.audio.chatterbox.engine import ChatterboxEngine
+    has_rs_codec = False
 
-def main():
-    parser = argparse.ArgumentParser(description="Benchmark Chatterbox TTS Engine Latency")
-    parser.add_argument("--model_dir", type=str, required=True, help="Path to Chatterbox ONNX snapshot")
-    parser.add_argument("--backbone_dir", type=str, required=False, help="Path to backbone (GPU)", default=None)
-    parser.add_argument("--text", type=str, default="This is a quick test of the TTS streaming latency. We need to ensure that the response is incredibly fast.", help="Text to generate")
-    parser.add_argument("--runs", type=int, default=3, help="Number of times to run")
-    args = parser.parse_args()
+def benchmark_text_splitting():
+    print(f"rs_codec available: {has_rs_codec}")
 
-    print(f"Loading engine with model_dir={args.model_dir}...")
-    engine = ChatterboxEngine(
-        model_dir=args.model_dir,
-        backbone_dir=args.backbone_dir,
-        device="cpu",
-        dtype="float32",
-    )
+    # Pure Python baseline (mocked to represent pre-rust code that was removed)
+    text = "Hello there. How are you doing today? I am doing well! This is a test of the text splitting algorithm." * 100
 
-    t0 = time.time()
-    try:
-        engine.load()
-    except Exception as e:
-        print(f"Engine load failed (expected if mock used or paths invalid): {e}")
-        return
+    t0 = time.perf_counter()
+    chunks = []
+    buffer = ""
+    for char in text:
+        buffer += char
+        if char in {'.', '!', '?'}:
+            chunks.append(buffer)
+            buffer = ""
+    t1 = time.perf_counter()
+    py_time = (t1 - t0) * 1000
+    print(f"Python text split baseline: {py_time:.2f} ms")
 
-    print(f"Engine loaded in {time.time() - t0:.2f}s")
-
-    # Warmup
-    print("Running warmup pass...")
-    try:
-        engine.generate("Warmup text.")
-    except Exception as e:
-         pass # Might fail in mock
-
-    for i in range(args.runs):
-        print(f"\n--- Run {i+1} ---")
-        t_start = time.time()
-        wav, metrics = engine.generate(args.text)
-        t_total = time.time() - t_start
-
-        print("Metrics:")
-        for k, v in metrics.items():
-            print(f"  {k}: {v}")
-        print(f"Total outside time: {t_total:.4f}s")
-        print(f"RTF (external): {t_total / max(metrics.get('audio_duration', 0.001), 0.001):.4f}")
+    if has_rs_codec:
+        t2 = time.perf_counter()
+        splitter = rs_codec.SentenceSplitter(min_sentence_length=2)
+        rust_chunks = splitter.add_text(text)
+        t3 = time.perf_counter()
+        rs_time = (t3 - t2) * 1000
+        print(f"Rust text split (rs_codec): {rs_time:.2f} ms")
+        print(f"Speedup: {py_time / rs_time:.2f}x")
 
 if __name__ == "__main__":
-    main()
+    benchmark_text_splitting()

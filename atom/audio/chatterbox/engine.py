@@ -330,19 +330,18 @@ class ChatterboxEngine:
         }
 
         next_token = None
+        seq_len = inputs_embeds.shape[1]
         for i in range(max_tokens):
             if i == 0:
                 cur_embeds = inputs_embeds
-                seq_len = cur_embeds.shape[1]
-                attention_mask = np.ones((batch_size, seq_len), dtype=np.int64)
             else:
                 cur_embeds = self.service.embed_single_token(
                     next_token,
                     exaggeration=exaggeration,
                 )
-                attention_mask = np.concatenate(
-                    [attention_mask, np.ones((batch_size, 1), dtype=np.int64)], axis=1
-                )
+
+            # Preallocate attention_mask without np.concatenate to save overhead
+            attention_mask = np.ones((batch_size, seq_len + i), dtype=np.int64)
 
             llm_inputs = {
                 "inputs_embeds": cur_embeds,

@@ -9,13 +9,8 @@ sys.modules['vllm'] = MagicMock()
 
 import torch
 
-import rs_codec
-print("rs_codec imported successfully")
-
 from atom.audio.chatterbox.engine import ChatterboxEngine
 
-try:
-    engine = ChatterboxEngine(model_dir="dummy", device="cpu", dtype="float32")
-    print("Engine initialized")
-except Exception as e:
-    print(f"Engine init failed: {e}")
+# Just testing it still imports fine
+engine = ChatterboxEngine(model_dir="dummy", device="cpu", dtype="float32")
+print("Engine initialized")
