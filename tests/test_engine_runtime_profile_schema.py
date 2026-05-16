@@ -107,6 +107,13 @@ def test_python_runtime_profile_model_packing_helper():
     assert payload["supports_gpu_memory_telemetry"] is True
 
 
+def test_python_runtime_profile_layer_offloading_helper():
+    engine_runtime_profile = _load_python_profile_class()
+    profile = engine_runtime_profile().with_layer_offloading_state(True)
+    payload = profile.to_dict()
+    assert payload["supports_layer_offloading"] is True
+
+
 def test_python_runtime_profile_compact_runtime_helper():
     engine_runtime_profile = _load_python_profile_class()
     profile = engine_runtime_profile().with_compact_runtime_state(

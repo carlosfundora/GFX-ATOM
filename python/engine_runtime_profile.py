@@ -43,6 +43,7 @@ class EngineRuntimeProfile:
     supports_kvcached_memory_sharing: bool = False
     supports_model_sleep_mode: bool = False
     supports_model_move_operations: bool = False
+    supports_layer_offloading: bool = False
     supports_gpu_memory_telemetry: bool = False
     supports_cpu_only_runtime: bool = False
     supports_download_on_first_use: bool = False
@@ -204,6 +205,14 @@ class EngineRuntimeProfile:
             supports_model_sleep_mode=supports_model_sleep_mode,
             supports_model_move_operations=supports_model_move_operations,
             supports_gpu_memory_telemetry=supports_gpu_memory_telemetry,
+        )
+
+    def with_layer_offloading_state(
+        self, supports_layer_offloading: bool
+    ) -> "EngineRuntimeProfile":
+        return replace(
+            self,
+            supports_layer_offloading=supports_layer_offloading,
         )
 
     def with_compact_runtime_state(

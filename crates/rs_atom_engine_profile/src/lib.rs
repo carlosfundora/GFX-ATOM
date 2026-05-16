@@ -235,6 +235,7 @@ pub struct EngineRuntimeProfile {
     pub supports_kvcached_memory_sharing: bool,
     pub supports_model_sleep_mode: bool,
     pub supports_model_move_operations: bool,
+    pub supports_layer_offloading: bool,
     pub supports_gpu_memory_telemetry: bool,
     pub supports_cpu_only_runtime: bool,
     pub supports_download_on_first_use: bool,
@@ -355,6 +356,7 @@ impl Default for EngineRuntimeProfile {
             supports_kvcached_memory_sharing: false,
             supports_model_sleep_mode: false,
             supports_model_move_operations: false,
+            supports_layer_offloading: false,
             supports_gpu_memory_telemetry: false,
             supports_cpu_only_runtime: false,
             supports_download_on_first_use: false,
@@ -518,6 +520,11 @@ impl EngineRuntimeProfile {
         self
     }
 
+    pub fn with_layer_offloading_state(mut self, supports_layer_offloading: bool) -> Self {
+        self.supports_layer_offloading = supports_layer_offloading;
+        self
+    }
+
     pub fn with_compact_runtime_state(
         mut self,
         supports_cpu_only_runtime: bool,
@@ -640,6 +647,7 @@ mod tests {
         assert!(!profile.supports_kvcached_memory_sharing);
         assert!(!profile.supports_model_sleep_mode);
         assert!(!profile.supports_model_move_operations);
+        assert!(!profile.supports_layer_offloading);
         assert!(!profile.supports_gpu_memory_telemetry);
         assert!(!profile.supports_cpu_only_runtime);
         assert!(!profile.supports_download_on_first_use);
@@ -739,6 +747,12 @@ mod tests {
         assert!(profile.supports_model_sleep_mode);
         assert!(!profile.supports_model_move_operations);
         assert!(profile.supports_gpu_memory_telemetry);
+    }
+
+    #[test]
+    fn layer_offloading_state_helper_sets_layer_offloading() {
+        let profile = EngineRuntimeProfile::default().with_layer_offloading_state(true);
+        assert!(profile.supports_layer_offloading);
     }
 
     #[test]

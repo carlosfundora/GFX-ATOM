@@ -284,6 +284,22 @@ Outcome:
 
 - QAQ now has a dedicated quality-adaptive policy profile and validation coverage without changing the runtime backend contract.
 
+### Wave 25 (Nautilus golden-ratio KV profile)
+
+1. `NautilusQuant` deterministic golden-ratio lane for KV quantization geometry
+
+Outcome:
+
+- Nautilus now has a dedicated golden-ratio policy profile and validation coverage without changing the runtime backend contract.
+
+### Wave 26 (ik_llama.cpp layer offloading metadata)
+
+1. `ik_llama.cpp` layer-offloading capability lane for CPU/hybrid placement support
+
+Outcome:
+
+- Layer offloading is now explicit in the runtime profile contract without changing execution behavior.
+
 ## Toggle/Configuration Contract
 
 All extracted features are opt-in by default and must remain fail-closed.
