@@ -316,6 +316,22 @@ Outcome:
 
 - gfxGRAPH graph-bridge capabilities are now explicit in the runtime profile contract with matching Python/Rust parity coverage.
 
+### Wave 29 (vLLM family runtime profile)
+
+1. `vllm` / `vllm-omni` / `vllm-ascend` runtime-family lane for multimodal serving, omni modality, and hardware plugin metadata
+
+Outcome:
+
+- The vLLM donor family now contributes a portable runtime capability seam without changing backend execution behavior.
+
+### Wave 30 (vLLM family runtime profile extension)
+
+1. `vllm` / `vllm-omni` / `vllm-ascend` runtime-family lane for additional adapter metadata and parity coverage
+
+Outcome:
+
+- The runtime profile contract now includes the vLLM family seam in both Python and Rust with focused validation coverage.
+
 ## Toggle/Configuration Contract
 
 All extracted features are opt-in by default and must remain fail-closed.

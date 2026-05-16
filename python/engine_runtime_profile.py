@@ -73,6 +73,9 @@ class EngineRuntimeProfile:
     supports_pure_jax_tpu_serving: bool = False
     supports_cross_device_benchmarking: bool = False
     supports_single_graph_capture: bool = False
+    supports_multimodal_serving: bool = False
+    supports_omni_modality: bool = False
+    supports_hardware_plugin_interface: bool = False
     supports_graph_shape_bucketing: bool = False
     supports_graph_validation_mode: bool = False
     supports_graph_conditional_nodes: bool = False
@@ -233,6 +236,20 @@ class EngineRuntimeProfile:
             supports_graph_validation_mode=supports_graph_validation_mode,
             supports_graph_conditional_nodes=supports_graph_conditional_nodes,
             supports_graph_nested_capture=supports_graph_nested_capture,
+        )
+
+    def with_vllm_runtime_family_state(
+        self,
+        *,
+        supports_multimodal_serving: bool,
+        supports_omni_modality: bool,
+        supports_hardware_plugin_interface: bool,
+    ) -> "EngineRuntimeProfile":
+        return replace(
+            self,
+            supports_multimodal_serving=supports_multimodal_serving,
+            supports_omni_modality=supports_omni_modality,
+            supports_hardware_plugin_interface=supports_hardware_plugin_interface,
         )
 
     def with_compact_runtime_state(

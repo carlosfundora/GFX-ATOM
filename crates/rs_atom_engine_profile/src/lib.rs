@@ -265,6 +265,9 @@ pub struct EngineRuntimeProfile {
     pub supports_pure_jax_tpu_serving: bool,
     pub supports_cross_device_benchmarking: bool,
     pub supports_single_graph_capture: bool,
+    pub supports_multimodal_serving: bool,
+    pub supports_omni_modality: bool,
+    pub supports_hardware_plugin_interface: bool,
     pub supports_graph_shape_bucketing: bool,
     pub supports_graph_validation_mode: bool,
     pub supports_graph_conditional_nodes: bool,
@@ -390,6 +393,9 @@ impl Default for EngineRuntimeProfile {
             supports_pure_jax_tpu_serving: false,
             supports_cross_device_benchmarking: false,
             supports_single_graph_capture: false,
+            supports_multimodal_serving: false,
+            supports_omni_modality: false,
+            supports_hardware_plugin_interface: false,
             supports_graph_shape_bucketing: false,
             supports_graph_validation_mode: false,
             supports_graph_conditional_nodes: false,
@@ -644,6 +650,18 @@ impl EngineRuntimeProfile {
         self.supports_graph_nested_capture = supports_graph_nested_capture;
         self
     }
+
+    pub fn with_vllm_runtime_family_state(
+        mut self,
+        supports_multimodal_serving: bool,
+        supports_omni_modality: bool,
+        supports_hardware_plugin_interface: bool,
+    ) -> Self {
+        self.supports_multimodal_serving = supports_multimodal_serving;
+        self.supports_omni_modality = supports_omni_modality;
+        self.supports_hardware_plugin_interface = supports_hardware_plugin_interface;
+        self
+    }
 }
 
 #[cfg(test)]
@@ -685,6 +703,9 @@ mod tests {
         assert!(!profile.supports_openai_compatible_server);
         assert!(!profile.supports_progressive_kv_compression);
         assert!(!profile.supports_full_document_mode);
+        assert!(!profile.supports_multimodal_serving);
+        assert!(!profile.supports_omni_modality);
+        assert!(!profile.supports_hardware_plugin_interface);
         assert!(!profile.supports_graph_shape_bucketing);
         assert!(!profile.supports_graph_validation_mode);
         assert!(!profile.supports_graph_conditional_nodes);
@@ -863,6 +884,16 @@ mod tests {
         assert!(profile.supports_graph_validation_mode);
         assert!(profile.supports_graph_conditional_nodes);
         assert!(!profile.supports_graph_nested_capture);
+    }
+
+    #[test]
+    fn vllm_runtime_family_state_helper_sets_multimodal_and_plugin_capabilities() {
+        let profile = EngineRuntimeProfile::default().with_vllm_runtime_family_state(
+            true, true, false,
+        );
+        assert!(profile.supports_multimodal_serving);
+        assert!(profile.supports_omni_modality);
+        assert!(!profile.supports_hardware_plugin_interface);
     }
 
     #[test]

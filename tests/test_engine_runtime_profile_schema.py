@@ -226,3 +226,16 @@ def test_python_runtime_profile_gfxgraph_bridge_helper():
     assert payload["supports_graph_validation_mode"] is True
     assert payload["supports_graph_conditional_nodes"] is True
     assert payload["supports_graph_nested_capture"] is False
+
+
+def test_python_runtime_profile_vllm_runtime_family_helper():
+    engine_runtime_profile = _load_python_profile_class()
+    profile = engine_runtime_profile().with_vllm_runtime_family_state(
+        supports_multimodal_serving=True,
+        supports_omni_modality=True,
+        supports_hardware_plugin_interface=False,
+    )
+    payload = profile.to_dict()
+    assert payload["supports_multimodal_serving"] is True
+    assert payload["supports_omni_modality"] is True
+    assert payload["supports_hardware_plugin_interface"] is False

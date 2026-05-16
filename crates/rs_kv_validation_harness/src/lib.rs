@@ -143,6 +143,19 @@ pub fn run_validation_suite() -> ValidationReport {
         note: serde_json::to_string(&gfxgraph_profile).unwrap(),
     });
 
+    let vllm_family_profile = EngineRuntimeProfile::default().with_vllm_runtime_family_state(
+        true,
+        true,
+        false,
+    );
+    cases.push(ValidationCase {
+        name: "vllm_runtime_family_profile_shape".into(),
+        passed: vllm_family_profile.supports_multimodal_serving
+            && vllm_family_profile.supports_omni_modality
+            && !vllm_family_profile.supports_hardware_plugin_interface,
+        note: serde_json::to_string(&vllm_family_profile).unwrap(),
+    });
+
     cases.push(ValidationCase {
         name: "radix_runtime_profile_defaults".into(),
         passed: runtime_profile.radix_cache_kind.is_none()
