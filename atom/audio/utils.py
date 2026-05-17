@@ -126,38 +126,39 @@ def apply_speed_adjustment(
         return audio, sample_rate
 
     try:
-        if not np.issubdtype(audio.dtype, np.floating):
-            audio = audio.astype(np.float32)
+        with torch.inference_mode():
+            if not np.issubdtype(audio.dtype, np.floating):
+                audio = audio.astype(np.float32)
 
-        # Stereo numpy arrays use channels-last (T, C);
-        # torch expects channels-first (C, T).
-        channels_last = audio.ndim == 2
-        if channels_last:
-            waveform = torch.from_numpy(audio.T)
-        else:
-            waveform = torch.from_numpy(audio).unsqueeze(0)
+            # Stereo numpy arrays use channels-last (T, C);
+            # torch expects channels-first (C, T).
+            channels_last = audio.ndim == 2
+            if channels_last:
+                waveform = torch.from_numpy(audio.T)
+            else:
+                waveform = torch.from_numpy(audio).unsqueeze(0)
 
-        n_fft = 2048
-        hop_length = n_fft // 4
-        to_spec = torchaudio.transforms.Spectrogram(
-            n_fft=n_fft, hop_length=hop_length, power=None,
-        )
-        stretch = torchaudio.transforms.TimeStretch(
-            n_freq=n_fft // 2 + 1, hop_length=hop_length,
-        )
-        to_wave = torchaudio.transforms.InverseSpectrogram(
-            n_fft=n_fft, hop_length=hop_length,
-        )
+            n_fft = 2048
+            hop_length = n_fft // 4
+            to_spec = torchaudio.transforms.Spectrogram(
+                n_fft=n_fft, hop_length=hop_length, power=None,
+            )
+            stretch = torchaudio.transforms.TimeStretch(
+                n_freq=n_fft // 2 + 1, hop_length=hop_length,
+            )
+            to_wave = torchaudio.transforms.InverseSpectrogram(
+                n_fft=n_fft, hop_length=hop_length,
+            )
 
-        spec = to_spec(waveform)
-        stretched = stretch(spec, speed)
-        expected_length = int(audio.shape[0] / speed)
-        result = to_wave(stretched, length=expected_length)
+            spec = to_spec(waveform)
+            stretched = stretch(spec, speed)
+            expected_length = int(audio.shape[0] / speed)
+            result = to_wave(stretched, length=expected_length)
 
-        result = result.squeeze(0).numpy()
-        if channels_last:
-            result = result.T
-        return result, sample_rate
+            result = result.squeeze(0).numpy()
+            if channels_last:
+                result = result.T
+            return result, sample_rate
     except Exception as e:
         logger.error("Speed adjustment failed: %s", e)
         raise ValueError("Failed to apply speed adjustment.") from e
