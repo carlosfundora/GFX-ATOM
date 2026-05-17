@@ -332,6 +332,17 @@ Outcome:
 
 - The runtime profile contract now includes the vLLM family seam in both Python and Rust with focused validation coverage.
 
+### Wave 31 (SMG positional-index contract)
+
+1. `smg` positional-index routing primitive for composite content-hash + position-aware bookkeeping
+
+Outcome:
+
+- `PositionalIndexKey`, `PositionalIndexEntry`, `PositionalIndexError`, and `PositionalIndexResult<T>` added to `rs_kv_quant_contracts`.
+- Serde round-trip test and error-display test added to `rs_kv_quant_contracts`.
+- Two new validation cases added to `rs_kv_validation_harness`: `positional_index_entry_round_trip` and `positional_index_error_shape`.
+- All Rust tests pass: `rs_kv_quant_contracts` (8), `rs_kv_validation_harness` (2).
+
 ## Toggle/Configuration Contract
 
 All extracted features are opt-in by default and must remain fail-closed.

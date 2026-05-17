@@ -77,6 +77,32 @@ impl MatchResult for PrefixMatchResult {
     }
 }
 
+/// Composite key for a positional KV block (position + content hash).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PositionalIndexKey {
+    pub position: usize,
+    pub content_hash: ContentHash,
+}
+
+/// Full positional index record: key + sequence hash + owning worker.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PositionalIndexEntry {
+    pub key: PositionalIndexKey,
+    pub sequence_hash: SequenceHash,
+    pub worker_id: u32,
+}
+
+/// Typed errors for positional index operations.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum PositionalIndexError {
+    #[error("worker {0} is not tracked in the positional index")]
+    WorkerNotTracked(u32),
+    #[error("parent block at position {0} not found for worker {1}")]
+    ParentBlockNotFound(usize, u32),
+}
+
+pub type PositionalIndexResult<T> = Result<T, PositionalIndexError>;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum KvCodec {
@@ -611,5 +637,34 @@ mod tests {
         assert!((result.hit_ratio() - 0.75).abs() < f64::EPSILON);
         let empty = PrefixMatchResult::new("worker-2", 0, 0);
         assert_eq!(empty.hit_ratio(), 0.0);
+    }
+
+    #[test]
+    fn positional_index_contract_round_trips() {
+        let key = PositionalIndexKey {
+            position: 3,
+            content_hash: ContentHash(0xdead_beef),
+        };
+        let entry = PositionalIndexEntry {
+            key,
+            sequence_hash: SequenceHash(0xfeed_cafe),
+            worker_id: 7,
+        };
+        let json = serde_json::to_string(&entry).expect("serialize");
+        let back: PositionalIndexEntry = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(entry, back);
+        assert_eq!(back.key.position, 3);
+        assert_eq!(back.worker_id, 7);
+
+        let e1 = PositionalIndexError::WorkerNotTracked(99);
+        assert!(e1.to_string().contains("99"));
+        let e2 = PositionalIndexError::ParentBlockNotFound(5, 2);
+        assert!(e2.to_string().contains("5"));
+        assert!(e2.to_string().contains("2"));
+
+        let ok: PositionalIndexResult<u32> = Ok(42);
+        assert_eq!(ok.unwrap(), 42);
+        let err: PositionalIndexResult<u32> = Err(PositionalIndexError::WorkerNotTracked(1));
+        assert!(err.is_err());
     }
 }

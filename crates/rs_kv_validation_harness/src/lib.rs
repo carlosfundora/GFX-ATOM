@@ -3,10 +3,11 @@ use rs_atom_engine_profile::EngineRuntimeProfile;
 use rs_kv_codec_adapters::CodecAdapterRegistry;
 use rs_kv_quant_contracts::{
     compute_content_hash, compute_request_content_hashes, normalize_codec_alias, AgentStepGraph,
-    CapturedGraph, GraphFingerprint, GraphPool, KvCodec, KvDecodeTelemetryBundle, KvEvictionDecision,
-    KvPolicyMode, KvPrefetchPlan, KvQuantPolicy, KvStorageTier, KvTransferPlan, MetadataLayout,
-    MatchResult, PrefixMatchResult, PrecomputedContextAsset, PrecomputedKvAsset, RadixSnapshotNode,
-    RadixTreeSnapshot,
+    CapturedGraph, ContentHash, GraphFingerprint, GraphPool, KvCodec, KvDecodeTelemetryBundle,
+    KvEvictionDecision, KvPolicyMode, KvPrefetchPlan, KvQuantPolicy, KvStorageTier, KvTransferPlan,
+    MetadataLayout, MatchResult, PositionalIndexEntry, PositionalIndexError, PositionalIndexKey,
+    PrefixMatchResult, PrecomputedContextAsset, PrecomputedKvAsset, RadixSnapshotNode,
+    RadixTreeSnapshot, SequenceHash,
 };
 use serde::{Deserialize, Serialize};
 
@@ -154,6 +155,32 @@ pub fn run_validation_suite() -> ValidationReport {
             && vllm_family_profile.supports_omni_modality
             && !vllm_family_profile.supports_hardware_plugin_interface,
         note: serde_json::to_string(&vllm_family_profile).unwrap(),
+    });
+
+    let pi_entry = PositionalIndexEntry {
+        key: PositionalIndexKey {
+            position: 2,
+            content_hash: ContentHash(0xabcd_1234),
+        },
+        sequence_hash: SequenceHash(0x5678_ef01),
+        worker_id: 3,
+    };
+    let pi_json = serde_json::to_string(&pi_entry).unwrap();
+    let pi_back: PositionalIndexEntry = serde_json::from_str(&pi_json).unwrap();
+    cases.push(ValidationCase {
+        name: "positional_index_entry_round_trip".into(),
+        passed: pi_back == pi_entry && pi_back.key.position == 2 && pi_back.worker_id == 3,
+        note: pi_json,
+    });
+
+    let err_worker = PositionalIndexError::WorkerNotTracked(42);
+    let err_parent = PositionalIndexError::ParentBlockNotFound(7, 42);
+    cases.push(ValidationCase {
+        name: "positional_index_error_shape".into(),
+        passed: err_worker.to_string().contains("42")
+            && err_parent.to_string().contains("7")
+            && err_parent.to_string().contains("42"),
+        note: format!("{} | {}", err_worker, err_parent),
     });
 
     cases.push(ValidationCase {
