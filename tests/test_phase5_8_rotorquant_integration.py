@@ -199,6 +199,20 @@ class TestAdapterIntegration:
         
         assert scores.shape == (2, 64)
         assert scores.dtype == query.dtype
+
+    def test_rust_path_default_with_failure_fallback(self):
+        """Rust path is always preferred; fallback is only entered on rust failure."""
+        adapter = SGLangRotorQuantAdapter(
+            kv_cache_dtype_flag="rq3_planar",
+            dimension=256,
+            num_heads=16,
+        )
+        k_cache = torch.randn(2, 64, 256)
+        encoded = adapter.encode_kv(k_cache)
+        assert encoded["rust_path_preferred"] is True
+        assert encoded["backend"] in {"rust", "fallback_quantized"}
+        if encoded["backend"] == "fallback_quantized":
+            assert encoded["rust_path_failed"] is True
     
     def test_multi_layer_encoding(self):
         """Test encoding across multiple layers."""

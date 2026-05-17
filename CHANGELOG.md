@@ -1,3 +1,26 @@
+## Wave 33D: Rust-First Rotor Adapter Default Path
+
+**Date:** 2026-05-17  
+**Work:** Enforced Rust-first execution in `SGLangRotorQuantAdapter` so fallback paths activate only after concrete Rust load/encode/decode failures.  
+**Status:** ✅ COMPLETE
+
+### Changes
+
+1. **Rust-First Adapter Execution (`python/sglang_backend_adapter.py`)**
+   - Added explicit Rust mode resolution (`planar3/planar4/iso3/iso4`) and Rust codec bootstrap at adapter init.
+   - Made Rust path the default hot path in `encode_kv` and `estimate_inner_product`.
+   - Added one-way failure latch (`_rust_failed`) so fallback activation reflects actual Rust failures.
+   - Implemented deterministic fallback quantization/dequantization path for resilience when Rust path is unavailable or errors.
+   - Replaced random placeholder attention scores with deterministic decode + einsum scoring.
+
+2. **Regression Coverage (`tests/test_phase5_8_rotorquant_integration.py`)**
+   - Added test asserting rust-path preference and failure-triggered fallback semantics.
+
+3. **Validation**
+   - `58 passed` across:
+     - `tests/test_phase5_8_rotorquant_integration.py`
+     - `tests/test_phase6_2_tiered_kv_cache.py`
+
 ## Wave 33C: Tiered KV Rust Rotor Path Hardening
 
 **Date:** 2026-05-17  
