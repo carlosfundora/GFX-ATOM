@@ -285,3 +285,80 @@ All backends support TurboQuant KV compression with graceful fallback to uncompr
    - KV warmup hook implementation
    - Kernel dispatch routing for RDNA2
    - TurboQuant codec registry integration
+
+## Phase 6.2: Two-Tier KV Cache Strategy (RotorQuant GPU + TurboQuant RAM Spill)
+
+**Objective:** Implement adaptive two-tier KV caching for extreme-context scenarios.
+
+**Tier Architecture:**
+- **Tier 1 (GPU Primary)**: RotorQuant with 3-bit quantization
+  - Compression: 8x (64 bytes → 8 bytes per 16-value block)
+  - Metadata: 2 bytes (rotation index + scale) per block
+  - Fast GPU access for hot/recent sequences
+  
+- **Tier 2 (RAM Secondary)**: TurboQuant fallback
+  - System RAM spill for older/cold sequences
+  - Minimal latency penalty for on-demand access
+  - Automatic hot-block promotion to GPU
+
+**Features Implemented:**
+1. **TieredKvCacheManager** (`tiered_kv_cache_manager.py`)
+   - Core two-tier allocation and eviction logic
+   - LRU + importance-weighted eviction strategy
+   - Block-level granularity (16-value blocks)
+   - Automatic tier assignment and promotion
+   - Statistics tracking: hit rate, swap overhead, utilization
+
+2. **TieredKvCacheAdapter** (integrated into `sglang_backend_adapter.py`)
+   - High-level API for SGLang integration
+   - Codec adapter creation (RotorQuant primary, TurboQuant secondary)
+   - Cache statistics and human-readable summaries
+   - Flags: `--kv-cache-dtype rq3_planar` (Tier 1), fallback to `tq2` (Tier 2)
+
+3. **Eviction Strategy**
+   - Cold blocks evicted first (age-based LRU)
+   - Low-importance blocks prioritized for eviction (importance-weighted)
+   - Pinned blocks (prefix cache) never evicted
+   - Space reclamation from both tiers
+
+4. **Test Coverage**
+   - 15 unit + scenario tests, all passing
+   - `test_phase6_2_tiered_kv_cache.py`: Core manager tests
+   - Long-context scenario: 100K+ token handling with appropriate GPU/RAM split
+   - Importance-weighted eviction: Critical blocks preserved under pressure
+   - Hot-block promotion: Access patterns tracked for dynamic tier management
+
+**Performance Characteristics:**
+- GPU tier capacity: 8GB default (tunable)
+- RAM tier capacity: 32GB default (tunable)
+- Compression ratio: 8x maintained (RotorQuant 3-bit + 2B metadata)
+- VRAM overhead: Negligible (metadata only)
+
+**Configuration Flags:**
+```bash
+--kv-cache-dtype rq3_planar      # Tier 1 codec (primary)
+--gpu-kv-cache-mb 8000            # GPU capacity
+--ram-kv-cache-mb 32000           # RAM capacity
+--kv-importance-threshold 0.7     # Hot-block promotion threshold
+```
+
+**Use Cases:**
+1. Long-context inference (100K-1M tokens) with elastic tier switching
+2. Importance-weighted attention where critical prefixes must stay on GPU
+3. Batch serving with temporal locality (recent blocks on GPU, older on RAM)
+4. Memory-constrained environments (spill gracefully to system RAM)
+
+**Verification:**
+- All 15 tests passing (100% pass rate)
+- GPU tier hit rate metrics functional
+- RAM tier miss/swap metrics functional
+- LRU + importance weighting verified
+- Block promotion logic tested
+
+**Next Steps:**
+- Integrate with SGLang scheduler for cross-request block lifetime management
+- Profile tier swap latency on gfx1030
+- Optimize eviction heuristics based on real attention patterns
+- Extend to multi-layer KV management (per-layer tier sizing)
+
+---

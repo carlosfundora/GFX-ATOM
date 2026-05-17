@@ -412,3 +412,5 @@ fn rs_rotorquant_codec(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyRotorQuantCodec>()?;
     Ok(())
 }
+
+pub mod hybrid;
