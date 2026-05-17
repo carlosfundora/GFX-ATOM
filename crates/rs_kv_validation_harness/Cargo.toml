@@ -12,5 +12,6 @@ rs_autoquant_policy = { path = "../rs_autoquant_policy" }
 rs_atom_engine_profile = { path = "../rs_atom_engine_profile" }
 rs_kv_codec_adapters = { path = "../rs_kv_codec_adapters" }
 rs_kv_quant_contracts = { path = "../rs_kv_quant_contracts" }
+rs_turboquant_codec = { path = "../rs_turboquant_codec" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

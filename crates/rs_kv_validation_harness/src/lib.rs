@@ -11,6 +11,8 @@ use rs_kv_quant_contracts::{
 };
 use serde::{Deserialize, Serialize};
 
+mod turboquant_tests;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ValidationCase {
     pub name: String,

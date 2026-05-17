@@ -5,5 +5,6 @@ members = [
     "crates/rs_kv_quant_contracts",
     "crates/rs_autoquant_policy",
     "crates/rs_kv_validation_harness",
+    "crates/rs_turboquant_codec",
 ]
 resolver = "2"
