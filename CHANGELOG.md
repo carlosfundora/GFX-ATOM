@@ -6,6 +6,8 @@ All notable changes to gfxATOM are documented in this file.
 
 ### Added — Kernel Backend Expansion (Wave 1)
 
+- **Auralis audio optimization merge resolution** (`atom/audio/chatterbox/engine.py`): Resolved PR #27 against current `main` by preserving preallocated CPU ONNX token and attention-mask buffers while keeping the Auralis audio post-processing and benchmark additions.
+
 - **Rust File Walker** (`atom_rust.find_files`): Synced the SGLang `ignore::WalkBuilder` recursive file walker into gfxATOM's existing PyO3 extension, added a Python `os.walk` fallback helper, and wired recursive Python-file discovery through it. This targets faster traversal of large Hugging Face/model cache trees while preserving hidden-file visibility and symlink traversal for snapshot layouts.
 
 - **Chatterbox ONNX CPU/Q8 Helpers** (`atom/audio/chatterbox/`): Centralized ONNX Runtime CPU session tuning with physical-core default intra-op threads, added Q8 sidecar artifact resolution/conversion helpers, exposed `--tts-onnx-variant` and `--tts-onnx-threads`, and added a `quantize_q8` CLI that writes optimized sidecars without mutating Hugging Face snapshots.
