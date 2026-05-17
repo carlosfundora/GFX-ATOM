@@ -1043,7 +1043,8 @@ class ModelRunner:
         logger.info(
             f"{self.label}: dummy PREFILL batch executed with {num_tokens} tokens, {num_reqs} reqs"
         )
-        # TODO: initialize KV connector during warmup
+        # initialize KV connector during warmup
+        get_kvconnector(config=self.config)
         return True
 
     def warmup_model(self):
