@@ -10,6 +10,7 @@ pub mod error;
 pub mod polar;
 pub mod qjl;
 pub mod turbo;
+pub mod simd;
 
 pub use error::{Error, Result};
 pub use polar::{PolarCode, PolarQuantizer};
