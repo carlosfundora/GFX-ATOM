@@ -179,6 +179,86 @@ pub enum KvStorageTier {
     ObjectStore,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UniversalKvStage {
+    HotRotor,
+    WarmRotorPolar,
+    ColdTurboResidual,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UniversalKvBlockHeaderV1 {
+    pub block_size: u16,
+    pub bit_width: u8,
+    pub rotor_id: u8,
+    pub codec: KvCodec,
+    pub stage: UniversalKvStage,
+    pub scale: f32,
+    pub flags: u8,
+    pub origin_model_tag: u16,
+}
+
+impl UniversalKvBlockHeaderV1 {
+    pub const FLAG_PINNED: u8 = 0b0000_0001;
+    pub const FLAG_TURBO_RESIDUAL: u8 = 0b0000_0010;
+
+    pub fn has_flag(&self, flag: u8) -> bool {
+        self.flags & flag != 0
+    }
+
+    pub fn should_apply_turbo_residual(&self) -> bool {
+        self.stage == UniversalKvStage::ColdTurboResidual
+            || self.has_flag(Self::FLAG_TURBO_RESIDUAL)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct UniversalKvPlacementPolicy {
+    pub hot_importance_threshold: f32,
+    pub warm_importance_threshold: f32,
+    pub warm_age_steps: u32,
+    pub cold_age_steps: u32,
+    pub gpu_high_watermark: f32,
+}
+
+impl Default for UniversalKvPlacementPolicy {
+    fn default() -> Self {
+        Self {
+            hot_importance_threshold: 0.80,
+            warm_importance_threshold: 0.35,
+            warm_age_steps: 128,
+            cold_age_steps: 512,
+            gpu_high_watermark: 0.90,
+        }
+    }
+}
+
+impl UniversalKvPlacementPolicy {
+    pub fn select_stage(
+        &self,
+        importance: f32,
+        age_steps: u32,
+        gpu_utilization_pct: f32,
+    ) -> UniversalKvStage {
+        let importance = importance.clamp(0.0, 1.0);
+        let gpu_utilization_pct = gpu_utilization_pct.clamp(0.0, 1.0);
+
+        if importance >= self.hot_importance_threshold
+            && age_steps <= self.warm_age_steps
+            && gpu_utilization_pct <= self.gpu_high_watermark
+        {
+            return UniversalKvStage::HotRotor;
+        }
+
+        if importance >= self.warm_importance_threshold && age_steps <= self.cold_age_steps {
+            return UniversalKvStage::WarmRotorPolar;
+        }
+
+        UniversalKvStage::ColdTurboResidual
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KvQuantPolicy {
     pub model_id: String,
@@ -779,5 +859,40 @@ mod tests {
         assert_eq!(align_dimension_to_16(17), 32);
         assert_eq!(align_dimension_to_16(100), 112);
         assert_eq!(align_dimension_to_16(255), 256);
+    }
+
+    #[test]
+    fn universal_kv_stage_policy_prefers_hot_for_recent_high_importance() {
+        let policy = UniversalKvPlacementPolicy::default();
+        let stage = policy.select_stage(0.95, 8, 0.40);
+        assert_eq!(stage, UniversalKvStage::HotRotor);
+    }
+
+    #[test]
+    fn universal_kv_stage_policy_demotes_under_pressure() {
+        let policy = UniversalKvPlacementPolicy::default();
+        let stage = policy.select_stage(0.95, 8, 0.98);
+        assert_eq!(stage, UniversalKvStage::WarmRotorPolar);
+        let cold = policy.select_stage(0.10, 900, 0.98);
+        assert_eq!(cold, UniversalKvStage::ColdTurboResidual);
+    }
+
+    #[test]
+    fn universal_kv_block_header_round_trip_and_flags() {
+        let header = UniversalKvBlockHeaderV1 {
+            block_size: 16,
+            bit_width: 3,
+            rotor_id: 7,
+            codec: KvCodec::Rq3Planar,
+            stage: UniversalKvStage::WarmRotorPolar,
+            scale: 0.125,
+            flags: UniversalKvBlockHeaderV1::FLAG_TURBO_RESIDUAL,
+            origin_model_tag: 42,
+        };
+        let json = serde_json::to_string(&header).unwrap();
+        let restored: UniversalKvBlockHeaderV1 = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.block_size, 16);
+        assert_eq!(restored.bit_width, 3);
+        assert!(restored.should_apply_turbo_residual());
     }
 }
