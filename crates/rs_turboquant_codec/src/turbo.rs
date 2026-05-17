@@ -66,7 +66,7 @@ impl TurboQuantizer {
         }
 
         let polar = PolarQuantizer::new(dim, bits.saturating_sub(1), seed)?;
-        let qjl = QjlQuantizer::new(projections, seed.wrapping_add(1))?;
+        let qjl = QjlQuantizer::new(dim, projections, seed.wrapping_add(1))?;
 
         Ok(Self {
             dim,
