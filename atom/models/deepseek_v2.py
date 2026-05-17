@@ -1169,7 +1169,7 @@ class Indexer(nn.Module):
         self.topk_indices_buffer = topk_indices_buffer
 
         self.k_cache = DeepseekV32IndexerCache(
-            head_dim=self.head_dim + 4,
+            head_dim=((self.head_dim + 4 + 15) // 16) * 16,
             dtype=torch.float8_e4m3fn,
             prefix=f"{prefix}.k_cache",
             cache_config=cache_config,
