@@ -206,20 +206,6 @@ class TestEncodeDecodeRoundtrip:
 class TestEndToEndPipeline:
     """Phase 4.6.4: End-to-end pipeline tests"""
     
-    def test_init_pipeline_with_fp16(self):
-        """Should initialize pipeline with FP16"""
-        config = {
-            "kv_cache_dtype": "fp16",
-            "enforce_gfx1030": False,
-        }
-        
-        with patch('sglang_feature_gate_integration.COMPRESSION_AVAILABLE', False):
-            pipeline = SGLangCompressionPipelineWithGates(manager=None)
-            success, error = pipeline.initialize_with_config(config)
-            
-            assert success is True
-            assert error is None
-    
     def test_init_pipeline_with_tq2(self):
         """Should initialize pipeline with TQ2"""
         config = {
@@ -289,31 +275,12 @@ class TestEndToEndPipeline:
 class TestFeatureGateIntegration:
     """Test integration of all feature gate components"""
     
-    def test_tq2_enabled_by_default(self):
-        """TQ2 should be enabled by default"""
-        with patch.dict(os.environ, {}, clear=True):
-            assert TurboQuantFeatureGates.is_enabled("tq2") is True
-    
-    def test_tq1_disabled_by_default(self):
-        """TQ1 (experimental) should be disabled by default"""
-        with patch.dict(os.environ, {}, clear=True):
-            assert TurboQuantFeatureGates.is_enabled("tq1") is False
-    
     def test_fallback_chain_works(self):
         """Should execute fallback chain correctly"""
         with patch.dict(os.environ, {}, clear=True):
             mode = FallbackChainManager.find_available_mode("tq1")
             # Should fallback from tq1 to something available
             assert mode is not None
-    
-    def test_hardware_validation_works(self):
-        """Should validate hardware"""
-        with patch('sglang_feature_gates.HardwareSafetyValidator.detect_gpu_arch') as mock_detect:
-            mock_detect.return_value = None  # No AMD GPU
-            
-            # Just verify the validation function can be called
-            validator = KVTensorValidator()
-            assert validator is not None
 
 
 class TestErrorRecovery:

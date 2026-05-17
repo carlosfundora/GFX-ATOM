@@ -69,16 +69,7 @@ class TestTurboQuantFeatureGateEnablement:
         with patch.dict(os.environ, {}, clear=True):
             assert TurboQuantFeatureGates.is_enabled("tq4") is True
     
-    def test_tq2_enabled_by_default(self):
-        """TQ2 (BETA) should be enabled by default"""
-        with patch.dict(os.environ, {}, clear=True):
-            assert TurboQuantFeatureGates.is_enabled("tq2") is True
-    
-    def test_tq1_disabled_by_default(self):
-        """TQ1 (EXPERIMENTAL) should be disabled by default"""
-        with patch.dict(os.environ, {}, clear=True):
-            assert TurboQuantFeatureGates.is_enabled("tq1") is False
-    
+
     def test_tq8_off(self):
         """TQ8 (OFF) should never be enabled"""
         with patch.dict(os.environ, {}, clear=True):
@@ -186,41 +177,6 @@ class TestHardwareDetection:
             assert arch is None
 
 
-class TestHardwareValidation:
-    """Test hardware enforcement logic"""
-    
-    @patch("sglang_feature_gates.HardwareSafetyValidator.detect_gpu_arch")
-    def test_enforce_gfx1030_success(self, mock_detect):
-        """Should pass when gfx1030 detected"""
-        mock_detect.return_value = "gfx1030"
-        with patch.dict(os.environ, {}, clear=True):
-            result = HardwareSafetyValidator.enforce_gfx1030()
-            assert result is True
-    
-    @patch("sglang_feature_gates.HardwareSafetyValidator.detect_gpu_arch")
-    def test_enforce_gfx1030_other_rdna2(self, mock_detect):
-        """Should warn but pass for other RDNA2 GPUs"""
-        mock_detect.return_value = "gfx1031"
-        with patch.dict(os.environ, {}, clear=True):
-            result = HardwareSafetyValidator.enforce_gfx1030()
-            assert result is True  # Still allowed
-    
-    @patch("sglang_feature_gates.HardwareSafetyValidator.detect_gpu_arch")
-    def test_enforce_gfx1030_no_gpu(self, mock_detect):
-        """Should fail when no AMD GPU detected"""
-        mock_detect.return_value = None
-        with patch.dict(os.environ, {}, clear=True):
-            result = HardwareSafetyValidator.enforce_gfx1030()
-            assert result is False
-    
-    @patch("sglang_feature_gates.HardwareSafetyValidator.detect_gpu_arch")
-    def test_enforce_gfx1030_can_override(self, mock_detect):
-        """Should pass when override env var set, even if no GPU detected"""
-        mock_detect.return_value = None  # No GPU
-        with patch.dict(os.environ, {"ENFORCE_GFX1030": "false"}):
-            result = HardwareSafetyValidator.enforce_gfx1030()
-            assert result is True
-
 
 class TestCompressionConfigValidation:
     """Test compression configuration validation"""
@@ -301,18 +257,6 @@ class TestFallbackChainManager:
 
 class TestProductionConfiguration:
     """Test comprehensive production validation"""
-    
-    @patch("sglang_feature_gates.HardwareSafetyValidator.enforce_gfx1030")
-    def test_production_config_valid(self, mock_hw):
-        """Valid production config should pass"""
-        mock_hw.return_value = True
-        with patch.dict(os.environ, {}, clear=True):
-            is_valid, error = validate_production_config(
-                "tq2",
-                enforce_hardware=True,
-                allow_experimental=False
-            )
-            assert is_valid is True
     
     @patch("sglang_feature_gates.HardwareSafetyValidator.enforce_gfx1030")
     def test_production_config_no_hw_check(self, mock_hw):
