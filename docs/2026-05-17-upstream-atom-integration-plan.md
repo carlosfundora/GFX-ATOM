@@ -94,16 +94,36 @@ Upstream ATOM has received 129 commits since 2026-05-01, including critical fixe
 - Security patch (SafeUnpickler) required (887788d)
 - FP8 KV dimension fix applied to DeepSeek v2 (10fba75)
 
-### Phase 2: Feature Assessment (Next sprint)
+### Phase 2: Feature Assessment ✓ COMPLETE
 
-**Todos:**
-1. Audit audio layer requirements vs. DEMERZEL
-2. Catalog new model support and integration points
-3. Assess kernel improvements vs. existing kernel collection
+**Completed work:**
+1. ✓ Audited audio layer requirements vs. DEMERZEL (deferral recommended)
+2. ✓ Cataloged new model support (DeepSeek-v4, Kimi K2.5, LFM2, Fish Speech S2 Pro, VoxCPM2)
+3. ✓ Assessed kernel improvements (FlashInfer CUTLASS, RDNA2 HIP, RotorQuant/TurboQuant)
+4. ✓ Created comprehensive assessment document: `wave-33-phase2-upstream-assessment.md`
 
-**Expected output:**
-- Decision matrix for audio/model/kernel features
-- Deferral plan or integration schedule
+**Phase 2 output:**
+- Audio layer deferral: coordinate with DEMERZEL (not blocking Phase 2)
+- Model support: transparent to gfxATOM-Rust (runtime-driven, no code changes needed)
+- Kernel improvements: selective integration (high-priority: FlashInfer, RDNA2, Quant)
+- Decision matrix: defer audio, integrate kernels, observe models
+
+**Key findings:**
+- DEMERZEL audio orchestration is mature; upstream improvements are complementary
+- Model enumeration flows from upstream ATOM runtime (no gfxATOM-Rust changes needed)
+- Kernel improvements are additive; FlashInfer CUTLASS enablement unblocks better selection
+- No new critical issues identified; Phase 1 fixes remain valid
+
+### Phase 2 Action Plan (Next sprint)
+
+**Immediate (post-Phase-2):**
+1. Update kernel canonical collection with FlashInfer, RDNA2, RotorQuant tags
+2. Document model support in integration notes
+3. Plan DEMERZEL audio coordination task
+
+**Deferred (Phase 3):**
+1. Implement KV warmup initialization hooks (requires engine profile extension)
+2. Audio layer integration with DEMERZEL (requires cross-team context)
 
 ## Integration Gates
 
