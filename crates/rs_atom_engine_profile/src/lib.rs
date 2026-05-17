@@ -673,6 +673,41 @@ impl EngineRuntimeProfile {
         self
     }
 
+    pub fn supports_kv_quantization_mode(&self, mode: &KvQuantizationMode) -> bool {
+        match mode {
+            KvQuantizationMode::None => true,
+            KvQuantizationMode::Fp8E4M3 | KvQuantizationMode::Fp8E5M2 => {
+                self.supports_fp8_kv_cache
+            }
+            KvQuantizationMode::TurboQuant => self.supports_turboquant_kv,
+            KvQuantizationMode::RotorQuant => self.supports_rotorquant_kv,
+            KvQuantizationMode::Int8 | KvQuantizationMode::Int4 => {
+                self.supports_atom_kv_quant || self.supports_kv_cache_quantization_pipeline
+            }
+            KvQuantizationMode::EngineNative => true,
+            KvQuantizationMode::Custom(_) => false,
+        }
+    }
+
+    pub fn supported_kv_quantization_modes(&self) -> Vec<KvQuantizationMode> {
+        let mut modes = Vec::new();
+        if self.supports_fp8_kv_cache {
+            modes.push(KvQuantizationMode::Fp8E4M3);
+            modes.push(KvQuantizationMode::Fp8E5M2);
+        }
+        if self.supports_turboquant_kv {
+            modes.push(KvQuantizationMode::TurboQuant);
+        }
+        if self.supports_rotorquant_kv {
+            modes.push(KvQuantizationMode::RotorQuant);
+        }
+        if self.supports_atom_kv_quant || self.supports_kv_cache_quantization_pipeline {
+            modes.push(KvQuantizationMode::Int8);
+            modes.push(KvQuantizationMode::Int4);
+        }
+        modes
+    }
+
     pub fn with_warmup_initialization_state(
         mut self,
         kv_connector_initialized: bool,
@@ -914,6 +949,21 @@ mod tests {
         assert!(profile.supports_multimodal_serving);
         assert!(profile.supports_omni_modality);
         assert!(!profile.supports_hardware_plugin_interface);
+    }
+
+    #[test]
+    fn kv_quantization_mode_helpers_cover_turbo_and_rotor() {
+        let profile = EngineRuntimeProfile {
+            supports_atom_kv_quant: true,
+            supports_turboquant_kv: true,
+            supports_rotorquant_kv: true,
+            supports_kv_cache_quantization_pipeline: true,
+            ..EngineRuntimeProfile::default()
+        };
+        assert!(profile.supports_kv_quantization_mode(&KvQuantizationMode::TurboQuant));
+        assert!(profile.supports_kv_quantization_mode(&KvQuantizationMode::RotorQuant));
+        assert!(profile.supported_kv_quantization_modes().contains(&KvQuantizationMode::Int8));
+        assert!(profile.supported_kv_quantization_modes().contains(&KvQuantizationMode::Int4));
     }
 
     #[test]

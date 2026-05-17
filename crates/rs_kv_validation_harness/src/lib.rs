@@ -1,4 +1,7 @@
-use rs_autoquant_policy::{AutoQuantFingerprint, AutoQuantObserverSnapshot, AutoQuantPolicy, SideStats};
+use rs_autoquant_policy::{
+    build_autoquant_backend_summary, AutoQuantFingerprint, AutoQuantObserverSnapshot,
+    AutoQuantPolicy, SideStats,
+};
 use rs_atom_engine_profile::EngineRuntimeProfile;
 use rs_kv_codec_adapters::CodecAdapterRegistry;
 use rs_kv_quant_contracts::{
@@ -30,7 +33,16 @@ pub fn run_validation_suite() -> ValidationReport {
     let registry = CodecAdapterRegistry::baseline();
     let mut cases = Vec::new();
 
-    for codec in [KvCodec::Tq4, KvCodec::Tq3, KvCodec::Tq2, KvCodec::Rq3Planar, KvCodec::Rq4Planar, KvCodec::Fp8E4M3] {
+    for codec in [
+        KvCodec::Tq4,
+        KvCodec::Tq3,
+        KvCodec::Tq2,
+        KvCodec::Rq3Planar,
+        KvCodec::Rq4Planar,
+        KvCodec::Rq3Iso,
+        KvCodec::Rq4Iso,
+        KvCodec::Fp8E4M3,
+    ] {
         let supported = registry.supports(&codec);
         cases.push(ValidationCase {
             name: format!("baseline_support::{codec:?}"),
@@ -117,6 +129,24 @@ pub fn run_validation_suite() -> ValidationReport {
         name: "kv_quant_policy_shape".into(),
         passed: kv_policy.codec == KvCodec::Tq4,
         note: "shared KV quant contract reachable".into(),
+    });
+
+    let autoquant_summary = build_autoquant_backend_summary(&policy, &registry);
+    cases.push(ValidationCase {
+        name: "autoquant_backend_summary_shape".into(),
+        passed: autoquant_summary.uniform
+            && autoquant_summary.dispatch.len() == 2
+            && autoquant_summary.dispatch[0].backend_chain == vec!["turboquant", "triton", "fp16"],
+        note: autoquant_summary.to_json_pretty().unwrap(),
+    });
+
+    let rotor_policy = AutoQuantPolicy::uniform("digest-rotor", "model", 1, KvCodec::Rq4Iso, 4, None);
+    let rotor_summary = build_autoquant_backend_summary(&rotor_policy, &registry);
+    cases.push(ValidationCase {
+        name: "autoquant_backend_summary_rotor_chain".into(),
+        passed: rotor_summary.dispatch[0].backend_chain
+            == vec!["rotorquant", "triton", "fp16"],
+        note: rotor_summary.to_json_pretty().unwrap(),
     });
 
     let runtime_profile = EngineRuntimeProfile::default().with_delegate_backend("aiter");

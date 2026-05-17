@@ -111,13 +111,53 @@ pub enum KvCodec {
     Fp8E4M3,
     Fp8E5M2,
     Int8,
+    Tq1,
     Tq4,
     Tq3,
     Tq2,
+    Tq8,
     Rq3Planar,
     Rq4Planar,
     Rq3Iso,
     Rq4Iso,
+}
+
+impl KvCodec {
+    pub fn is_turboquant(&self) -> bool {
+        matches!(
+            self,
+            KvCodec::Tq1 | KvCodec::Tq2 | KvCodec::Tq3 | KvCodec::Tq4 | KvCodec::Tq8
+        )
+    }
+
+    pub fn is_rotorquant(&self) -> bool {
+        matches!(
+            self,
+            KvCodec::Rq3Planar | KvCodec::Rq4Planar | KvCodec::Rq3Iso | KvCodec::Rq4Iso
+        )
+    }
+
+    pub fn is_rotorquant_planar(&self) -> bool {
+        matches!(self, KvCodec::Rq3Planar | KvCodec::Rq4Planar)
+    }
+
+    pub fn is_rotorquant_iso(&self) -> bool {
+        matches!(self, KvCodec::Rq3Iso | KvCodec::Rq4Iso)
+    }
+
+    pub fn bit_width(&self) -> Option<u8> {
+        match self {
+            KvCodec::Tq1 => Some(1),
+            KvCodec::Tq2 => Some(2),
+            KvCodec::Tq3 => Some(3),
+            KvCodec::Tq4 => Some(4),
+            KvCodec::Tq8 => Some(8),
+            KvCodec::Rq3Planar | KvCodec::Rq3Iso => Some(3),
+            KvCodec::Rq4Planar | KvCodec::Rq4Iso => Some(4),
+            KvCodec::Fp8E4M3 | KvCodec::Fp8E5M2 | KvCodec::Int8 => Some(8),
+            KvCodec::Auto | KvCodec::Bf16 => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -422,9 +462,11 @@ pub fn normalize_codec_alias(alias: &str) -> Result<KvCodec, KvCodecError> {
         "fp8_e4m3" | "atom_fp8" => Ok(KvCodec::Fp8E4M3),
         "fp8_e5m2" => Ok(KvCodec::Fp8E5M2),
         "int8" => Ok(KvCodec::Int8),
+        "tq1" => Ok(KvCodec::Tq1),
         "tq4" => Ok(KvCodec::Tq4),
         "tq3" => Ok(KvCodec::Tq3),
         "tq2" => Ok(KvCodec::Tq2),
+        "tq8" => Ok(KvCodec::Tq8),
         "rq3" | "rq3_planar" => Ok(KvCodec::Rq3Planar),
         "rq4" | "rq4_planar" => Ok(KvCodec::Rq4Planar),
         "rq3_iso" => Ok(KvCodec::Rq3Iso),
@@ -481,6 +523,14 @@ mod tests {
         let p = KvQuantPolicy::new("m", KvCodec::Tq4, KvPolicyMode::Adaptive);
         let s = serde_json::to_string(&p).unwrap();
         assert!(s.contains("tq4"));
+    }
+
+    #[test]
+    fn codec_family_helpers_cover_turbo_and_rotor() {
+        assert!(KvCodec::Tq2.is_turboquant());
+        assert!(KvCodec::Rq3Planar.is_rotorquant_planar());
+        assert!(KvCodec::Rq4Iso.is_rotorquant_iso());
+        assert_eq!(KvCodec::Rq4Iso.bit_width(), Some(4));
     }
 
     #[test]

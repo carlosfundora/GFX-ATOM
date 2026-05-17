@@ -241,6 +241,21 @@ def test_python_runtime_profile_vllm_runtime_family_helper():
     assert payload["supports_hardware_plugin_interface"] is False
 
 
+def test_python_runtime_profile_kv_quantization_helpers():
+    engine_runtime_profile = _load_python_profile_class()
+    profile = engine_runtime_profile(
+        supports_fp8_kv_cache=True,
+        supports_turboquant_kv=True,
+        supports_rotorquant_kv=True,
+        supports_atom_kv_quant=True,
+        supports_kv_cache_quantization_pipeline=True,
+    )
+    assert profile.supports_kv_quantization_mode("turboquant") is True
+    assert profile.supports_kv_quantization_mode("rotorquant") is True
+    assert profile.supports_kv_quantization_mode("fp8_e4m3") is True
+    assert "rotorquant" in profile.supported_kv_quantization_modes()
+
+
 def test_python_runtime_profile_warmup_initialization_helper():
     engine_runtime_profile = _load_python_profile_class()
     profile = engine_runtime_profile().with_warmup_initialization_state(
@@ -256,4 +271,3 @@ def test_python_runtime_profile_warmup_initialization_helper():
     assert payload["supports_model_load_warmup"] is False
     assert payload["warmup_kv_connector_initialized"] is True
     assert payload["warmup_prefill_batch_executed"] is True
-

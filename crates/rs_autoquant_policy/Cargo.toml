@@ -9,6 +9,7 @@ path = "src/lib.rs"
 
 [dependencies]
 rs_kv_quant_contracts = { path = "../rs_kv_quant_contracts" }
+rs_kv_codec_adapters = { path = "../rs_kv_codec_adapters" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"

@@ -1,4 +1,38 @@
 
+## Wave 33B Phase 4.3: TurboQuant/RotorQuant Routing Canonicalization
+
+**Date:** 2026-05-17  
+**Work:** Canonicalized TurboQuant/RotorQuant codec routing across Rust and Python adapter layers  
+**Status:** In progress
+
+### Changes
+
+1. **Expanded codec family helpers in Rust**
+   - Added TurboQuant/RotorQuant family predicates and bit-width helpers in `rs_kv_quant_contracts`
+   - Routed `tq*`, `rq*_planar`, `rq*_iso`, FP8, and INT8 through `CodecAdapterRegistry`
+
+2. **Aligned Python adapter registry and SGLang bridge**
+   - Added RotorQuant iso modes plus fp8/int8 parity in `python/kv_codec_adapters.py`
+   - Updated SGLang backend and AutoQuant summaries to emit rotor-aware backend chains
+
+3. **Extended runtime capability helpers**
+   - Added quantization-family capability helpers to `rs_atom_engine_profile` and its Python mirror
+   - Added regression coverage for RotorQuant and backend-chain summaries
+
+### Integration Gates Status
+
+- [x] Rust codec family helpers added
+- [x] Rust AutoQuant backend summary routes RotorQuant
+- [x] Python codec registry supports RotorQuant iso modes
+- [x] Python SGLang adapter emits rotor-aware fallback chains
+- [ ] Full Rust/Python test validation
+- [ ] Rust/Python profile parity verification after helper additions
+
+### Next Steps
+
+1. Run targeted Rust and Python tests for codec routing and runtime profile parity.
+2. Update the Phase 4.3 plan checkpoint after validation.
+
 ## Wave 33 Phase 2 Follow-Up: Kernel Improvements Identification
 
 **Date:** 2026-05-17  
@@ -50,4 +84,3 @@
    - KV warmup hook implementation
    - Kernel dispatch routing for RDNA2
    - TurboQuant codec registry integration
-

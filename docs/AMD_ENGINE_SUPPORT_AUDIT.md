@@ -57,6 +57,12 @@ gfxATOM TurboQuantizer (encode/decode/IP estimation)
 - KV cache layout: Already supports paged KV (AMD-friendly)
 - GPU memory: Already has offload policies (AMD VRAM-aware)
 
+**Quant options present in the fork:**
+- TurboQuant KV: `tq2`, `tq3`, `tq4`
+- RotorQuant KV: `rq3_planar`, `rq4_planar`
+- RotorQuant geometric modes: `planar3`, `planar4`, `iso3`, `iso4`
+- AutoQuant policy search: `{planar, iso, rq3, rq4, tq3, tq4}`
+
 ### 2. vLLM-1-bit-turbo ✅ SECONDARY
 
 **AMD Support Status:** ✅ Partial (Platform checks present)
@@ -92,10 +98,21 @@ gfxATOM TurboQuantizer adapter
 - Platform-aware code suggests AMD support is feasible
 - May need to check how QuantConfig routes to kernels
 
+**Audit Result (2026-05-17):**
+- `vllm.model_executor.layers.quantization` already exposes a generic `QuantizationConfig` registry via `register_quantization_config()`.
+- `vllm.config.cache.CacheConfig.cache_dtype` already models ROCm-aware KV cache dtypes, but it only includes native FP8 / per-token-head variants.
+- No TurboQuant-specific config or KV cache dtype exists in the fork, so there is no hidden AMD TurboQuant backend to assimilate directly from WIP.
+- The real integration seam is therefore a new custom `TurboQuantConfig` plus cache-dtype extension, not a refactor of an existing code path.
+
 **AMD-Specific Questions:**
 - [ ] Does vLLM have AMD-optimized paged attention kernel?
 - [ ] How does QuantConfig → kernel dispatch work?
 - [ ] Are there AMD examples in the fork?
+
+**Quant options present in the fork:**
+- TurboQuant KV presets: `turboquant_k8v4`, `turboquant_4bit_nc`, `turboquant_k3v4_nc`, `turboquant_3bit_nc`
+- TurboQuant attention backend: `TurboQuantAttentionBackend`
+- No RotorQuant KV surface found in the vLLM fork
 
 ### 3. llama.cpp-1-bit-turbo ✅ TERTIARY
 
@@ -147,6 +164,12 @@ HIP kernel for TurboQuantizer
 - ✅ ROCm hardening tests indicate AMD-native quality
 - ⚠️ C++ integration more complex than Python
 
+**Quant options present in the fork:**
+- Tensor conversion/serialization: `tq1_0`, `tq2_0`
+- RotorQuant ggml blocks: `block_planar3_0`, `block_planar4_0`, `block_iso3_0`, `block_iso4_0`
+- RotorQuant dequant kernels: `dequantize_planar3_0`, `dequantize_planar4_0`, `dequantize_iso3_0`, `dequantize_iso4_0`
+- GGML/HIP dispatch hooks for those block types are present
+
 ---
 
 ## Decision: AMD-Only Prioritization
@@ -160,8 +183,9 @@ HIP kernel for TurboQuantizer
 ### Tier 2: vLLM (CONDITIONAL)
 - ✅ Has current_platform.is_rocm() abstraction
 - ✅ Many quantization backends to study
-- ⚠️ Need to audit QuantConfig routing
-- **Action:** Phase 4.2b audit; proceed if QuantConfig is extensible
+- ✅ `QuantizationConfig` registry is extensible
+- ⚠️ No TurboQuant KV dtype/backend exists yet
+- **Action:** Phase 4.2b audit complete; future work needs a new TurboQuantConfig + cache dtype path
 
 ### Tier 3: llama.cpp (DEFERRED)
 - ✅ Full AMD support with dedicated HIP backend
@@ -187,9 +211,10 @@ HIP kernel for TurboQuantizer
 4. Benchmark if available
 
 ### For llama.cpp (TERTIARY - Defer unless critical)
-1. Document GGML extension requirements
-2. Prototype in Phase 6 if additional AMD inference needed
-3. Consider if custom HIP kernels required for optimal gfx1030 perf
+1. RotorQuant blocks already exist in ggml; assess whether KV cache wiring is enough
+2. Document GGML KV extension requirements if a cache-specific path is needed
+3. Prototype in Phase 6 if additional AMD inference needed
+4. Consider if custom HIP kernels required for optimal gfx1030 perf
 
 ---
 
@@ -253,4 +278,3 @@ Focus remains exclusively on AMD/ROCm paths.
 - **Scope:** AMD gfx1030 optimization only
 - **Last Updated:** 2026-05-17T03:17 UTC
 - **Status:** ACTIVE AUDIT (Phase 4.2b)
-

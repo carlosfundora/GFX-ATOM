@@ -1,3 +1,4 @@
+use rs_kv_codec_adapters::{CodecAdapterRegistry, CodecBackendPlan};
 use rs_kv_quant_contracts::KvCodec;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -9,6 +10,25 @@ use thiserror::Error;
 
 pub const POLICY_VERSION: u32 = 1;
 
+fn codec_name(codec: &KvCodec) -> &'static str {
+    match codec {
+        KvCodec::Auto => "auto",
+        KvCodec::Bf16 => "bf16",
+        KvCodec::Fp8E4M3 => "fp8_e4m3",
+        KvCodec::Fp8E5M2 => "fp8_e5m2",
+        KvCodec::Int8 => "int8",
+        KvCodec::Tq1 => "tq1",
+        KvCodec::Tq4 => "tq4",
+        KvCodec::Tq3 => "tq3",
+        KvCodec::Tq2 => "tq2",
+        KvCodec::Tq8 => "tq8",
+        KvCodec::Rq3Planar => "rq3_planar",
+        KvCodec::Rq4Planar => "rq4_planar",
+        KvCodec::Rq3Iso => "rq3_iso",
+        KvCodec::Rq4Iso => "rq4_iso",
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum Stage {
@@ -19,19 +39,23 @@ pub enum Stage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CodecChoice {
-    pub codec: KvCodec,
+    pub codec: String,
     pub bit_width: u8,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
 }
 
 impl CodecChoice {
-    pub fn new(codec: KvCodec, bit_width: u8, note: impl Into<Option<String>>) -> Self {
+    pub fn new(codec: impl Into<String>, bit_width: u8, note: impl Into<Option<String>>) -> Self {
         Self {
-            codec,
+            codec: codec.into(),
             bit_width,
             note: note.into(),
         }
+    }
+
+    pub fn resolved_codec(&self) -> Option<KvCodec> {
+        rs_kv_quant_contracts::normalize_codec_alias(&self.codec).ok()
     }
 }
 
@@ -60,7 +84,7 @@ impl AutoQuantPolicy {
         bit_width: u8,
         note: impl Into<Option<String>>,
     ) -> Self {
-        let choice = CodecChoice::new(codec, bit_width, note);
+        let choice = CodecChoice::new(codec_name(&codec), bit_width, note);
         let mut layer_codecs = BTreeMap::new();
         for layer in 0..n_layers {
             layer_codecs.insert(layer, choice.clone());
@@ -89,16 +113,90 @@ impl AutoQuantPolicy {
         self.layer_codecs
             .get(&layer_idx)
             .cloned()
-            .unwrap_or_else(|| CodecChoice::new(KvCodec::Tq4, 4, Some("autoquant fallback".into())))
+            .unwrap_or_else(|| CodecChoice::new("tq4", 4, Some("autoquant fallback".into())))
     }
 
     pub fn codec_histogram(&self) -> BTreeMap<String, usize> {
         let mut hist = BTreeMap::new();
         for choice in self.layer_codecs.values() {
-            let key = format!("{:?}:{}", choice.codec, choice.bit_width);
+            let key = format!("{}:{}", choice.codec, choice.bit_width);
             *hist.entry(key).or_insert(0) += 1;
         }
         hist
+    }
+
+    pub fn to_json_pretty(&self) -> serde_json::Result<String> {
+        serde_json::to_string_pretty(self)
+    }
+
+    pub fn from_json(text: &str) -> serde_json::Result<Self> {
+        serde_json::from_str(text)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutoQuantDispatchEntry {
+    pub layer_idx: u32,
+    pub stage: Stage,
+    pub codec: String,
+    pub bit_width: u8,
+    pub backend_chain: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutoQuantBackendSummary {
+    pub fingerprint_digest: String,
+    pub model_family: String,
+    pub n_layers: u32,
+    pub uniform: bool,
+    pub codec_histogram: BTreeMap<String, usize>,
+    pub dispatch: Vec<AutoQuantDispatchEntry>,
+}
+
+impl AutoQuantBackendSummary {
+    pub fn to_json_pretty(&self) -> serde_json::Result<String> {
+        serde_json::to_string_pretty(self)
+    }
+}
+
+pub fn build_autoquant_backend_summary(
+    policy: &AutoQuantPolicy,
+    registry: &CodecAdapterRegistry,
+) -> AutoQuantBackendSummary {
+    let mut dispatch = Vec::new();
+    for (layer_idx, choice) in &policy.layer_codecs {
+        let plan: Option<CodecBackendPlan> = choice
+            .resolved_codec()
+            .and_then(|codec| registry.backend_plan_for(&codec));
+        let backend_chain = plan
+            .map(|plan| plan.backend_chain())
+            .unwrap_or_else(|| vec!["native".into()]);
+        dispatch.push(AutoQuantDispatchEntry {
+            layer_idx: *layer_idx,
+            stage: Stage::Prefill,
+            codec: choice.codec.clone(),
+            bit_width: choice.bit_width,
+            backend_chain,
+        });
+    }
+
+    let uniform = if policy.layer_codecs.is_empty() {
+        true
+    } else {
+        let first = policy.layer_codecs.values().next().unwrap();
+        policy
+            .layer_codecs
+            .values()
+            .all(|choice| choice.codec == first.codec && choice.bit_width == first.bit_width)
+    };
+
+    AutoQuantBackendSummary {
+        fingerprint_digest: policy.fingerprint_digest.clone(),
+        model_family: policy.model_family.clone(),
+        n_layers: policy.n_layers,
+        uniform,
+        codec_histogram: policy.codec_histogram(),
+        dispatch,
     }
 }
 
@@ -235,7 +333,7 @@ mod tests {
     #[test]
     fn policy_lookup_prefers_layer_codec() {
         let policy = AutoQuantPolicy::uniform("dig", "m", 2, KvCodec::Tq4, 4, None);
-        assert_eq!(policy.codec_for(1, None).codec, KvCodec::Tq4);
+        assert_eq!(policy.codec_for(1, None).codec, "tq4");
     }
 
     #[test]
@@ -293,5 +391,22 @@ mod tests {
         let restored: AutoQuantObserverSnapshot = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.total_observations, 9);
         assert!(restored.layers.contains_key("L0_K"));
+    }
+
+    #[test]
+    fn backend_summary_uses_turboquant_chain() {
+        let registry = CodecAdapterRegistry::baseline();
+        let policy = AutoQuantPolicy::uniform("dig", "m", 2, KvCodec::Tq2, 2, None);
+        let summary = build_autoquant_backend_summary(&policy, &registry);
+        assert_eq!(summary.uniform, true);
+        assert_eq!(summary.dispatch[0].backend_chain, vec!["turboquant", "triton", "fp16"]);
+    }
+
+    #[test]
+    fn backend_summary_uses_rotorquant_chain() {
+        let registry = CodecAdapterRegistry::baseline();
+        let policy = AutoQuantPolicy::uniform("dig", "m", 1, KvCodec::Rq4Iso, 4, None);
+        let summary = build_autoquant_backend_summary(&policy, &registry);
+        assert_eq!(summary.dispatch[0].backend_chain, vec!["rotorquant", "triton", "fp16"]);
     }
 }

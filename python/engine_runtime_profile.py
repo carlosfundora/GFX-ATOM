@@ -257,6 +257,34 @@ class EngineRuntimeProfile:
             supports_hardware_plugin_interface=supports_hardware_plugin_interface,
         )
 
+    def supports_kv_quantization_mode(self, mode: str) -> bool:
+        normalized = mode.strip().lower()
+        if normalized == "none":
+            return True
+        if normalized in {"fp8_e4m3", "fp8_e5m2"}:
+            return self.supports_fp8_kv_cache
+        if normalized == "turboquant":
+            return self.supports_turboquant_kv
+        if normalized == "rotorquant":
+            return self.supports_rotorquant_kv
+        if normalized in {"int8", "int4"}:
+            return self.supports_atom_kv_quant or self.supports_kv_cache_quantization_pipeline
+        if normalized == "engine_native":
+            return True
+        return False
+
+    def supported_kv_quantization_modes(self) -> list[str]:
+        modes: list[str] = []
+        if self.supports_fp8_kv_cache:
+            modes.extend(["fp8_e4m3", "fp8_e5m2"])
+        if self.supports_turboquant_kv:
+            modes.append("turboquant")
+        if self.supports_rotorquant_kv:
+            modes.append("rotorquant")
+        if self.supports_atom_kv_quant or self.supports_kv_cache_quantization_pipeline:
+            modes.extend(["int8", "int4"])
+        return modes
+
     def with_compact_runtime_state(
         self,
         *,
