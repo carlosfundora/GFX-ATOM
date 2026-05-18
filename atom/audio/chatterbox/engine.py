@@ -26,6 +26,12 @@ try:
 except ImportError:
     _HAS_RS_CODEC = False
 
+try:
+    import onnxruntime
+    _HAS_ONNXRUNTIME = True
+except ImportError:
+    _HAS_ONNXRUNTIME = False
+
 from atom.audio.chatterbox.onnx_artifacts import resolve_component_path
 from atom.audio.chatterbox.service import (
     SAMPLE_RATE,
@@ -325,10 +331,9 @@ class ChatterboxEngine:
         exaggeration: float,
     ) -> np.ndarray:
         """Autoregressive generation on CPU using ONNX Runtime (fallback)."""
-        import onnxruntime
-
         llm = self._model
-        assert isinstance(llm, onnxruntime.InferenceSession)
+        if _HAS_ONNXRUNTIME:
+            assert isinstance(llm, onnxruntime.InferenceSession)
 
         inputs_embeds = prep["inputs_embeds"]
         num_layers = self.service.num_hidden_layers
@@ -418,6 +423,5 @@ class ChatterboxEngine:
     def _np_rep_penalty(input_ids, scores, penalty):
         score = np.take_along_axis(scores, input_ids, axis=1)
         score = np.where(score < 0, score * penalty, score / penalty)
-        out = scores.copy()
-        np.put_along_axis(out, input_ids, score, axis=1)
-        return out
+        np.put_along_axis(scores, input_ids, score, axis=1)
+        return scores
