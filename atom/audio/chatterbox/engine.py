@@ -257,9 +257,11 @@ class ChatterboxEngine:
         )
 
         rep_penalty = RepetitionPenaltyProcessor(repetition_penalty)
-        generate_tokens = torch.tensor(
-            [[START_SPEECH_TOKEN]], dtype=torch.long, device=self.device
-        )
+
+
+        generate_tokens = torch.zeros((1, max_tokens + 1), dtype=torch.long, device=self.device)
+        generate_tokens[0, 0] = START_SPEECH_TOKEN
+        gen_idx = 1
 
         past_key_values = None
 
@@ -286,7 +288,7 @@ class ChatterboxEngine:
             logits = outputs.logits[:, -1, :]
 
             # Apply repetition penalty
-            logits = rep_penalty(generate_tokens, logits)
+            logits = rep_penalty(generate_tokens[:, :gen_idx], logits)
 
             # Sample or argmax
             if temperature == 0.0:
@@ -301,13 +303,14 @@ class ChatterboxEngine:
                 probs = F.softmax(logits, dim=-1)
                 next_token = torch.multinomial(probs, num_samples=1)
 
-            generate_tokens = torch.cat([generate_tokens, next_token], dim=-1)
+            generate_tokens[0, gen_idx] = next_token.item()
+            gen_idx += 1
 
             if (next_token.flatten() == STOP_SPEECH_TOKEN).all():
                 break
 
         # Strip start/stop tokens
-        tokens = generate_tokens[:, 1:]
+        tokens = generate_tokens[:, 1:gen_idx]
         if tokens[0, -1] == STOP_SPEECH_TOKEN:
             tokens = tokens[:, :-1]
 
