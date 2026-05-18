@@ -60,13 +60,14 @@ def _get_lora_a_ptr(lora_a_weights: list[torch.Tensor], device: torch.device):
     ):
         raise ValueError("All LoRA weights must have the same stride.")
 
-    _LORA_A_PTR_DICT[key] = (
+    val = (
         lora_ptr_tensor,
         lora_strides_d0[0],
         lora_strides_d1[0],
         lora_strides_d2[0],
     )
-    return _LORA_A_PTR_DICT.get(key)
+    _LORA_A_PTR_DICT[key] = val
+    return val
 
 
 def _get_lora_b_ptr(
@@ -136,7 +137,7 @@ def _get_lora_b_ptr(
         same_stride = False
     # MAX_N is the maximum hidden size among all the lora_b weights
     MAX_N = max(hidden_sizes)
-    _LORA_B_PTR_DICT[key] = (
+    val = (
         slice_start_tensor,
         lora_ptr_tensor,
         lora_strides_d0_tensor,
@@ -146,7 +147,8 @@ def _get_lora_b_ptr(
         same_stride,
         MAX_N,
     )
-    return _LORA_B_PTR_DICT.get(key)
+    _LORA_B_PTR_DICT[key] = val
+    return val
 
 
 @functools.lru_cache
