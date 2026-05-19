@@ -257,9 +257,7 @@ class ChatterboxEngine:
         temperature: float,
     ) -> np.ndarray:
         """Autoregressive generation on GPU using HuggingFace model."""
-        inputs_embeds = torch.from_numpy(prep["inputs_embeds"]).to(
-            device=self.device, dtype=self.dtype
-        )
+        inputs_embeds = torch.as_tensor(prep["inputs_embeds"], device=self.device, dtype=self.dtype)
 
         rep_penalty = RepetitionPenaltyProcessor(repetition_penalty)
 
