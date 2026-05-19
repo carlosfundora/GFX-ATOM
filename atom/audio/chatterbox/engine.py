@@ -51,9 +51,8 @@ class RepetitionPenaltyProcessor:
     def __call__(self, input_ids: torch.Tensor, scores: torch.Tensor) -> torch.Tensor:
         score = torch.gather(scores, 1, input_ids)
         score = torch.where(score < 0, score * self.penalty, score / self.penalty)
-        scores_processed = scores.clone()
-        scores_processed.scatter_(1, input_ids, score)
-        return scores_processed
+        scores.scatter_(1, input_ids, score)
+        return scores
 
 
 class ChatterboxEngine:
