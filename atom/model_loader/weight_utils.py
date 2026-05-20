@@ -4,7 +4,7 @@
 # This code is adapted from https://github.com/ROCm/vllm/blob/main/vllm/model_executor/model_loader/weight_utils.py
 
 import fnmatch
-import hashlib
+from atom.utils.hash import stable_hash
 import json
 import logging
 import os
@@ -54,7 +54,7 @@ def get_lock(model_name_or_path: Union[str, Path], cache_dir: Optional[str] = No
     model_name_or_path = str(model_name_or_path)
     os.makedirs(os.path.dirname(lock_dir), exist_ok=True)
     model_name = model_name_or_path.replace("/", "-")
-    hash_name = hashlib.sha256(model_name.encode()).hexdigest()
+    hash_name = stable_hash(model_name)
     # add hash to avoid conflict with old users' lock files
     lock_file_name = hash_name + model_name + ".lock"
     # mode 0o666 is required for the filelock to be shared across users

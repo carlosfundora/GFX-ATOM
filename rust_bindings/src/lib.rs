@@ -1,6 +1,8 @@
 use ignore::WalkBuilder;
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 use xxhash_rust::xxh64::Xxh64;
+use xxhash_rust::xxh3::xxh3_128;
 
 #[pyfunction]
 fn compute_hash(token_ids: Vec<i64>, prefix: i128) -> u64 {
@@ -15,6 +17,18 @@ fn compute_hash(token_ids: Vec<i64>, prefix: i128) -> u64 {
         hasher.update(&token.to_le_bytes());
     }
     hasher.digest()
+}
+
+#[pyfunction]
+fn compute_string_hash(content: &str) -> String {
+    let hash = xxh3_128(content.as_bytes());
+    format!("{:032x}", hash)
+}
+
+#[pyfunction]
+fn compute_bytes_hash(content: &Bound<'_, PyBytes>) -> String {
+    let hash = xxh3_128(content.as_bytes());
+    format!("{:032x}", hash)
 }
 
 #[pyfunction]
@@ -52,6 +66,8 @@ fn find_files(path: &str) -> PyResult<Vec<String>> {
 #[pymodule]
 fn atom_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_hash, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_string_hash, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_bytes_hash, m)?)?;
     m.add_function(wrap_pyfunction!(find_files, m)?)?;
     Ok(())
 }
