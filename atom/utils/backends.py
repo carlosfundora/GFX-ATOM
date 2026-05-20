@@ -588,11 +588,9 @@ class VllmBackend:
                     continue
                 with open(filepath) as f:
                     hash_content.append(f.read())
-            import hashlib
+            from atom.utils.hash import stable_hash
 
-            code_hash = hashlib.md5(
-                "\n".join(hash_content).encode(), usedforsecurity=False
-            ).hexdigest()
+            code_hash = stable_hash("\n".join(hash_content))
             factors.append(code_hash)
 
             # 3. compiler hash
@@ -600,9 +598,7 @@ class VllmBackend:
             factors.append(compiler_hash)
 
             # combine all factors to generate the cache dir
-            hash_key = hashlib.md5(
-                str(factors).encode(), usedforsecurity=False
-            ).hexdigest()[:10]
+            hash_key = stable_hash(str(factors))[:10]
 
             cache_dir = os.path.join(
                 VLLM_CACHE_ROOT,

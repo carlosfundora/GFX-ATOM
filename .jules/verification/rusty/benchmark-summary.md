@@ -1,10 +1,10 @@
-# Prefix Cache Hash Benchmark Summary
+# Hash Benchmark Summary
 
-* **Before Command:** `python benchmark_block_manager_hash.py`
-* **After Command:** `python benchmark_rust_hash.py`
-* **Before Timing:** 5988 ms (100,000 iterations, ~16,699 hashes/s)
-* **After Timing:** 2431 ms (100,000 iterations, ~41,132 hashes/s)
-* **Percent Change:** Throughput increased by 146.3% (2.46x faster)
+* **Before command**: `python agents/scripts/benchmark_hashlib.py`
+* **After command**: `python agents/scripts/benchmark_hashlib_after.py`
+* **Before timing**: 388.69 ms
+* **After timing**: 359.04 ms
+* **Percent change**: ~7.6% speedup
 
-**Notes on Variance/Limitations:**
-This benchmark measures just the raw `compute_hash` function overhead which gets called heavily in the python hot path when prefix caching is enabled (every time a block is allocated or checked). The python version calls `np.array(token_ids).tobytes()` on every call, which involves list traversal and allocation. The Rust version iterates the integers directly and hashes them efficiently using `xxhash-rust`.
+* **Notes**: The benchmark tests 100,000 iterations of hashing a complex dictionary representation to string. The pure Python `hashlib.md5` approach has a small overhead in encoding the string to bytes before hashing, and parsing `md5` calls. The Rust `compute_string_hash` (backed by `xxh3_128`) avoids the explicit python `.encode()` boundary in the tight loop and utilizes a faster hashing algorithm, yielding a consistent and measurable speedup.
+
