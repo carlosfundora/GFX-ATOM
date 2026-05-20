@@ -85,19 +85,17 @@ def audio_to_bytes(
 
     sf_format, media_type, kwargs = format_map[response_format]
 
-    buf = io.BytesIO()
     if response_format == "pcm":
         # Raw 16-bit PCM (Optimized via Rust)
         if _HAS_RS_CODEC:
-            pcm_bytes = rs_codec.audio_to_pcm_bytes(audio)
-            buf.write(pcm_bytes)
+            return rs_codec.audio_to_pcm_bytes(audio), media_type
         else:
             pcm_data = np.clip(audio * 32767, -32768, 32767).astype(np.int16, copy=False)
-            buf.write(pcm_data.tobytes())
+            return pcm_data.tobytes(), media_type
     else:
+        buf = io.BytesIO()
         sf.write(buf, audio, sample_rate, format=sf_format, **kwargs)
-
-    return buf.getvalue(), media_type
+        return buf.getvalue(), media_type
 
 
 def apply_speed_adjustment(

@@ -49,6 +49,13 @@ class RepetitionPenaltyProcessor:
         self.penalty = penalty
 
     def __call__(self, input_ids: torch.Tensor, scores: torch.Tensor) -> torch.Tensor:
+        if input_ids.shape[0] == 1:
+            ids = input_ids[0]
+            score = scores[0, ids]
+            score = torch.where(score < 0, score * self.penalty, score / self.penalty)
+            scores[0, ids] = score
+            return scores
+
         score = torch.gather(scores, 1, input_ids)
         score = torch.where(score < 0, score * self.penalty, score / self.penalty)
         scores.scatter_(1, input_ids, score)
@@ -418,6 +425,13 @@ class ChatterboxEngine:
 
     @staticmethod
     def _np_rep_penalty(input_ids, scores, penalty):
+        if input_ids.shape[0] == 1:
+            ids = input_ids[0]
+            s = scores[0, ids]
+            s = np.where(s < 0, s * penalty, s / penalty)
+            scores[0, ids] = s
+            return scores
+
         score = np.take_along_axis(scores, input_ids, axis=1)
         score = np.where(score < 0, score * penalty, score / penalty)
         np.put_along_axis(scores, input_ids, score, axis=1)
