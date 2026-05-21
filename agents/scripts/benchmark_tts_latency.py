@@ -35,5 +35,58 @@ def benchmark_text_splitting():
         print(f"Rust text split (rs_codec): {rs_time:.2f} ms")
         print(f"Speedup: {py_time / rs_time:.2f}x")
 
-if __name__ == "__main__":
+import torch
+
+def benchmark_rep_penalty_numpy():
+    vocab_size = 32000
+    batch_size = 1
+    seq_len = 500
+
+    def new_in_place(input_ids, scores, penalty):
+        if input_ids.shape[0] == 1:
+            ids = input_ids[0]
+            s = scores[0, ids]
+            mask = s < 0
+            s[mask] *= penalty
+            s[~mask] /= penalty
+            scores[0, ids] = s
+            return scores
+        return scores
+
+    t0 = time.perf_counter()
+    for _ in range(1000):
+        scores = np.random.randn(batch_size, vocab_size)
+        input_ids = np.random.randint(0, vocab_size, size=(batch_size, seq_len))
+        new_in_place(input_ids, scores, 1.2)
+    py_time_new = (time.perf_counter() - t0) * 1000
+    print(f"NumPy rep penalty: {py_time_new:.2f} ms")
+
+def benchmark_rep_penalty_torch():
+    vocab_size = 32000
+    batch_size = 1
+    seq_len = 500
+
+    def new_in_place(input_ids, scores, penalty):
+        if input_ids.shape[0] == 1:
+            ids = input_ids[0]
+            s = scores[0, ids]
+            s.mul_(torch.where(s < 0, penalty, 1.0 / penalty))
+            scores[0, ids] = s
+            return scores
+        return scores
+
+    t0 = time.perf_counter()
+    for _ in range(1000):
+        scores = torch.randn(batch_size, vocab_size, device="cpu")
+        input_ids = torch.randint(0, vocab_size, size=(batch_size, seq_len), device="cpu")
+        new_in_place(input_ids, scores, 1.2)
+    py_time_new = (time.perf_counter() - t0) * 1000
+    print(f"Torch rep penalty: {py_time_new:.2f} ms")
+
+def main():
     benchmark_text_splitting()
+    benchmark_rep_penalty_numpy()
+    benchmark_rep_penalty_torch()
+
+if __name__ == '__main__':
+    main()

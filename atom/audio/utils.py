@@ -90,7 +90,8 @@ def audio_to_bytes(
         if _HAS_RS_CODEC:
             return rs_codec.audio_to_pcm_bytes(audio), media_type
         else:
-            pcm_data = np.clip(audio * 32767, -32768, 32767).astype(np.int16, copy=False)
+            pcm_data = np.empty_like(audio, dtype=np.int16)
+            np.clip(audio * 32767, -32768, 32767, out=pcm_data, casting='unsafe')
             return pcm_data.tobytes(), media_type
     else:
         buf = io.BytesIO()
