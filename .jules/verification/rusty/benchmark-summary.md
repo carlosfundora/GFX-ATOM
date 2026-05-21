@@ -1,10 +1,14 @@
-# Hash Benchmark Summary
+# Rust Refactor Benchmark Summary
 
-* **Before command**: `python agents/scripts/benchmark_hashlib.py`
-* **After command**: `python agents/scripts/benchmark_hashlib_after.py`
-* **Before timing**: 388.69 ms
-* **After timing**: 359.04 ms
-* **Percent change**: ~7.6% speedup
+## Tool Parser Performance
 
-* **Notes**: The benchmark tests 100,000 iterations of hashing a complex dictionary representation to string. The pure Python `hashlib.md5` approach has a small overhead in encoding the string to bytes before hashing, and parsing `md5` calls. The Rust `compute_string_hash` (backed by `xxh3_128`) avoids the explicit python `.encode()` boundary in the tight loop and utilizes a faster hashing algorithm, yielding a consistent and measurable speedup.
+- **Before Command**: `python3 test_tool_parser_perf.py`
+- **After Command**: `python3 test_tool_parser_perf.py`
+- **Before Timing**: 526.24 ms (for 10 iterations of 5000 tool calls)
+- **After Timing**: 170.21 ms (for 10 iterations of 5000 tool calls)
+- **Percent Change**: 67.66% improvement (3.1x speedup)
+- **Notes on Variance or Limitations**:
+  - Input was artificially large (5000 tool calls) to highlight parsing overhead.
+  - Rust implementation uses string searching instead of regex execution.
+  - Dictionary allocation in PyO3 takes up a notable portion of the remaining time.
 
