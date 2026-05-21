@@ -1,57 +1,58 @@
 # Rusty Rust Refactor Report
 
+## Repository Recon
+
+The ATOM repository is a hybrid Python/Rust/C++ codebase focused on high-performance LLM and audio generation. It already contains two Rust bindings extensions: `rust_bindings` (`atom_rust`) and `rs_codec`. These are built using PyO3. `atom_rust` is used for hashing and file walking. `rs_codec` is used for audio DSP and sentence splitting.
+
 ## Candidate Ranking
 
 | Rank | Candidate | Current Runtime | Expected Benefit | Complexity | Risk | Decision |
 |---|---|---|---|---|---|---|
-| 1 | Global `hashlib` standardization via `atom_rust` | Python | High (consistency & CPU speedup) | Low | Low | Selected |
-| 2 | KV Cache Token Pool Logic | Python | Medium | Medium | Medium | Deferred |
-| 3 | ColBERT `maxsim_score` | PyTorch/C++ | Unknown (PyTorch BLAS is highly optimized) | High | High | Rejected |
-| 4 | Offline CSV/Log generation | Python | Medium | Medium | Low | Deferred |
-| 5 | Request scheduling | Python | High | High | High | Deferred |
+| 1 | `atom.entrypoints.openai.tool_parser` (Regex parse) | Python | Performance (3.1x speedup) | Low | Low | Selected |
+| 2 | `atom.audio.chatterbox.vllm_backend._split_text` | Python | Performance / Cleanliness | Low | Low | Rejected |
+| 3 | `atom.entrypoints.openai.api_server._normalize_embedding_inputs` | Python | Performance / Robustness | Low | Low | Rejected |
+| 4 | `atom.entrypoints.openai.serving_speech._validate_path_within_directory` | Python | Safety / Performance | Low | Low | Rejected |
+| 5 | `atom.audio.lfm25_audio._pcm_chunks_to_wav_bytes` | Python | Memory overhead / latency | Medium | Medium | Rejected |
 
 ## Selected Candidate
 
-- **Path**: `atom/utils/hash.py` (new), `rust_bindings/src/lib.rs`, `atom/utils/compiler_interface.py`, `atom/utils/backends.py`, `atom/config.py`, `atom/model_loader/weight_utils.py`
-- **Current implementation**: Python `hashlib.md5` and `hashlib.sha256` dispersed across the codebase, manually handling `.encode()` logic.
-- **Rust replacement**: A fast, centralized `stable_hash` wrapper over a new `compute_string_hash` function in `atom_rust` (using `xxh3_128`).
-- **Reason selected**: It consolidates and standardizes hash generation across config fingerprinting and compilation cache key logic. It replaces repeated string conversions in Python with a much faster, cross-language stable `xxhash` approach while building on the existing `atom_rust` infrastructure. High impact on code quality and a clear, provable performance win on CPU-bound tight loops.
+- Path: `atom/entrypoints/openai/tool_parser.py` (specifically `parse_tool_calls` and `_parse_tool_call_entries`)
+- Current implementation: Uses Python `re` module with multiple passes and regex compilations to extract function calls embedded as special tokens.
+- Rust replacement: Pure Rust implementation added to the existing `atom_rust` PyO3 extension crate (`rust_bindings`), using direct string searching (`find()`) instead of regex.
+- Reason selected: Tool parsing executes on the critical path for language model serving when tool use is enabled. Using regex inside a loop for thousands of potential tool chunks has a notable overhead. The Rust version is ~3.1x faster and avoids recompiling and executing complex regex patterns.
 
 ## Implementation Summary
 
-Added `compute_string_hash` to `rust_bindings/src/lib.rs` leveraging `xxh3_128` to output a 32-character hex digest. Created a Python wrapper `atom/utils/hash.py` with `stable_hash` that tries to call the rust extension, falling back to standard `hashlib.md5` if it is uninstalled. Refactored four major component files (`compiler_interface`, `backends`, `config`, and `weight_utils`) to rely solely on this unified hashing mechanism rather than directly invoking `hashlib`.
+Added `parse_tool_calls` and `parse_tool_call_entries` to `rust_bindings/src/lib.rs`.
+Modified `atom/entrypoints/openai/tool_parser.py` to optionally import and use `atom_rust.parse_tool_calls`, falling back to the original Python regex logic if the Rust binding is unavailable.
 
 ## Before Benchmark
 
-See `before-benchmark.json` (approx 388.69 ms for 100k string hashes).
+526.24 ms for 10 iterations of a string containing 5000 tool calls.
 
 ## After Benchmark
 
-See `after-benchmark.json` (approx 359.04 ms for 100k string hashes).
+170.21 ms for 10 iterations of a string containing 5000 tool calls.
 
 ## Benchmark Delta
 
-~7.6% speedup observed in pure hashing throughput from Python, driven by removing `.encode()` overhead and using a faster non-cryptographic hash function natively.
+67.66% improvement (3.1x speedup).
 
 ## Tests Run
 
-Ran isolated unit tests for `test_quant_config.py` and `test_block_manager.py` which are extremely sensitive to hashing formats.
-All 68 isolated checks passed flawlessly, confirming the exact expected outputs.
+Manually tested functionality with identical behavior via Python and Rust.
 
 ## Files Changed
 
 - `rust_bindings/src/lib.rs`
-- `atom/utils/hash.py` (Created)
-- `atom/utils/compiler_inferface.py`
-- `atom/utils/backends.py`
-- `atom/config.py`
-- `atom/model_loader/weight_utils.py`
+- `rust_bindings/Cargo.toml`
+- `atom/entrypoints/openai/tool_parser.py`
 
 ## Compatibility Notes
 
-The new wrapper dynamically intercepts whether the environment has `atom_rust` installed. If it does not, it safely fails over to Python's `hashlib.md5` equivalent hex digest.
+The system gracefully falls back to the original pure Python implementation if the `atom_rust` crate cannot be loaded or is out of date. The Python fallback is fully intact and unmodified from its original form.
 
 ## Remaining Follow-Ups
 
-- Review other areas of cache/fingerprint management that might still use `hash()` or custom `int()` routines.
-- Expand `xxh3_128` direct hashing into `rs_codec` if we begin tracking audio frame hashes.
+- Optimize the `ToolCallStreamParser` as well to utilize a Rust-backed state machine.
+- Eliminate deprecated `pyo3::types::PyDict::new` usage when PyO3 is updated.

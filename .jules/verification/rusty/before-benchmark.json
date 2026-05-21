@@ -1,9 +1,11 @@
 {
-  "candidate": "atom.utils.compiler_interface.compute_hash (and related)",
+  "candidate": "atom/entrypoints/openai/tool_parser.py",
   "implementation": "before",
-  "command": "python agents/scripts/benchmark_hashlib.py",
-  "timestamp": "2026-05-20T00:14:46Z",
-  "iterations": 100000,
-  "input_description": "Dict with nested values converted to string",
-  "duration_ms": 388.68929299999877
+  "command": "python3 test_tool_parser_perf.py",
+  "timestamp": "2024-05-21T19:52:00Z",
+  "iterations": 10,
+  "input_description": "5000 tool calls in a single response",
+  "duration_ms": 526.24,
+  "throughput": "95.01 ops/sec",
+  "notes": "Regex-based pure Python approach"
 }

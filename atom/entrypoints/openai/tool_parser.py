@@ -35,6 +35,19 @@ class ToolCall:
 
 
 def parse_tool_calls(text: str) -> Tuple[str, List[ToolCall]]:
+    try:
+        import atom_rust
+        if hasattr(atom_rust, 'parse_tool_calls'):
+            content, calls_data = atom_rust.parse_tool_calls(text)
+            calls = [ToolCall(**c) for c in calls_data]
+            return content, calls
+    except ImportError:
+        pass
+
+    return _python_parse_tool_calls(text)
+
+
+def _python_parse_tool_calls(text: str) -> Tuple[str, List[ToolCall]]:
     """Parse tool calls from model output text.
 
     Args:
