@@ -346,8 +346,8 @@ class CreateAudio(BaseModel):
     stream_format: Literal["sse", "audio"] | None = "audio"
     base64_encode: bool = True
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = {"arbitrary_types_allowed": True}
+
 
 
 class AudioResponse(BaseModel):
