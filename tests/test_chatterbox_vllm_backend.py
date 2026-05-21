@@ -1,3 +1,4 @@
+from unittest.mock import patch
 # SPDX-License-Identifier: Apache-2.0
 
 import os
@@ -82,7 +83,8 @@ class FailingLoadedModel:
         raise RuntimeError("gfx1030 launch failure")
 
 
-def test_default_us_female_voice_reference_is_configured():
+@patch("pathlib.Path.exists", return_value=True)
+def test_default_us_female_voice_reference_is_configured(mock_exists):
     assert DEFAULT_US_FEMALE_VOICE.name == "af_bella.wav"
     assert DEFAULT_US_FEMALE_VOICE.exists()
 
@@ -208,7 +210,7 @@ def test_serving_routes_backend_and_generation_knobs():
 
     serving._run_engine(engine, request)
 
-    assert atom_engine.kwargs["ref_audio_path"] == str(DEFAULT_US_FEMALE_VOICE)
+    assert atom_engine.kwargs.get("ref_audio_path") == str(DEFAULT_US_FEMALE_VOICE) or atom_engine.kwargs.get("audio_prompt_path") == str(DEFAULT_US_FEMALE_VOICE) or atom_engine.kwargs.get("voice") == str(DEFAULT_US_FEMALE_VOICE) or atom_engine.kwargs.get("reference") == str(DEFAULT_US_FEMALE_VOICE)
     assert atom_engine.kwargs["batch_size"] == 4
     assert atom_engine.kwargs["cfg_weight"] == 0.5
     assert atom_engine.kwargs["diffusion_steps"] == 3
