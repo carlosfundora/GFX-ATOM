@@ -1,11 +1,9 @@
 {
-  "candidate": "atom/entrypoints/openai/tool_parser.py",
+  "candidate": "atom/entrypoints/openai/reasoning.py:ReasoningFilter",
   "implementation": "after",
-  "command": "python3 test_tool_parser_perf.py",
-  "timestamp": "2024-05-21T19:53:00Z",
-  "iterations": 10,
-  "input_description": "5000 tool calls in a single response",
-  "duration_ms": 170.21,
-  "throughput": "293.75 ops/sec",
-  "notes": "Rust backend via PyO3"
+  "command": "python benchmark_reasoning_rust.py",
+  "timestamp": "2026-05-22T10:14:02Z",
+  "iterations": 220000,
+  "input_description": "220000 small streaming chunks with thinking blocks",
+  "duration_ms": 133.1877779999786
 }

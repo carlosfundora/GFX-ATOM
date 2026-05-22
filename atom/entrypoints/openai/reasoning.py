@@ -40,7 +40,6 @@ def separate_reasoning(text: str) -> Tuple[Optional[str], str]:
     return (None, text)
 
 
-@dataclass
 class ReasoningFilter:
     """Stateful streaming filter that separates reasoning from content.
 
@@ -53,8 +52,19 @@ class ReasoningFilter:
         2 = after </think> (emitting as content)
     """
 
-    state: int = 0
-    buf: str = ""
+    def __init__(self):
+        try:
+            import atom_rust
+            if hasattr(atom_rust, 'ReasoningFilter'):
+                self._impl = atom_rust.ReasoningFilter()
+                self._is_rust = True
+                return
+        except ImportError:
+            pass
+
+        self._is_rust = False
+        self.state: int = 0
+        self.buf: str = ""
 
     def process(self, text: str) -> list:
         """Process a chunk of text and return list of (field, text) tuples.
@@ -66,6 +76,9 @@ class ReasoningFilter:
             List of (field_name, text) tuples where field_name is
             "reasoning_content" or "content".
         """
+        if self._is_rust:
+            return self._impl.process(text)
+
         results = []
 
         if self.state == 0:
@@ -121,6 +134,9 @@ class ReasoningFilter:
 
     def flush(self) -> list:
         """Flush any remaining buffered content."""
+        if self._is_rust:
+            return self._impl.flush()
+
         results = []
         if self.buf:
             if self.state == 0:

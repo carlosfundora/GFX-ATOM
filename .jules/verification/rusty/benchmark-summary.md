@@ -1,14 +1,8 @@
-# Rust Refactor Benchmark Summary
+# Benchmark Summary
 
-## Tool Parser Performance
-
-- **Before Command**: `python3 test_tool_parser_perf.py`
-- **After Command**: `python3 test_tool_parser_perf.py`
-- **Before Timing**: 526.24 ms (for 10 iterations of 5000 tool calls)
-- **After Timing**: 170.21 ms (for 10 iterations of 5000 tool calls)
-- **Percent Change**: 67.66% improvement (3.1x speedup)
-- **Notes on Variance or Limitations**:
-  - Input was artificially large (5000 tool calls) to highlight parsing overhead.
-  - Rust implementation uses string searching instead of regex execution.
-  - Dictionary allocation in PyO3 takes up a notable portion of the remaining time.
-
+- Before Command: `python benchmark_reasoning_isolated.py`
+- After Command: `python benchmark_reasoning_rust.py`
+- Before Timing: 183.90 ms
+- After Timing: 133.19 ms
+- Percent Change: -27.57% (27.57% faster)
+- Notes: Benchmarked 220,000 small streaming chunks simulating the token-by-token output of an autoregressive reasoning model (containing `<think>` blocks). The new rust native extension for `ReasoningFilter` significantly improves parsing throughput.

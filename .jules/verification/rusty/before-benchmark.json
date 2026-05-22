@@ -1,11 +1,9 @@
 {
-  "candidate": "atom/entrypoints/openai/tool_parser.py",
+  "candidate": "atom/entrypoints/openai/reasoning.py:ReasoningFilter",
   "implementation": "before",
-  "command": "python3 test_tool_parser_perf.py",
-  "timestamp": "2024-05-21T19:52:00Z",
-  "iterations": 10,
-  "input_description": "5000 tool calls in a single response",
-  "duration_ms": 526.24,
-  "throughput": "95.01 ops/sec",
-  "notes": "Regex-based pure Python approach"
+  "command": "python benchmark_reasoning_isolated.py",
+  "timestamp": "2026-05-22T10:12:04Z",
+  "iterations": 220000,
+  "input_description": "220000 small streaming chunks with thinking blocks",
+  "duration_ms": 183.89997600002062
 }

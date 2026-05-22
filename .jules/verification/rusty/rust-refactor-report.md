@@ -2,57 +2,53 @@
 
 ## Repository Recon
 
-The ATOM repository is a hybrid Python/Rust/C++ codebase focused on high-performance LLM and audio generation. It already contains two Rust bindings extensions: `rust_bindings` (`atom_rust`) and `rs_codec`. These are built using PyO3. `atom_rust` is used for hashing and file walking. `rs_codec` is used for audio DSP and sentence splitting.
+The ATOM repository is a vLLM-like implementation focusing on integration and optimization based on AITER. It exposes an OpenAI-compatible API Server (`atom/entrypoints/openai_server.py`). The repository relies extensively on a native Rust extension `atom_rust` located under `rust_bindings/` to accelerate hot path tasks such as token ID hashing, string hashing, fast file scanning, and streaming tool call extraction (`parse_tool_calls` in `atom/entrypoints/openai/tool_parser.py`).
+
+In `atom/entrypoints/openai/reasoning.py`, a `ReasoningFilter` class is used similarly to `ToolCallStreamParser` to separate `<think>` blocks from the normal chat completions output text. This logic is invoked directly within the asynchronous generation tight loop (`create_chat_chunk` iteration within `serving_chat.py`). Since string allocations and manipulations in Python can become a bottleneck when processing tokens one by one, migrating this streaming parser to Rust provides a valuable latency reduction.
 
 ## Candidate Ranking
 
 | Rank | Candidate | Current Runtime | Expected Benefit | Complexity | Risk | Decision |
 |---|---|---|---|---|---|---|
-| 1 | `atom.entrypoints.openai.tool_parser` (Regex parse) | Python | Performance (3.1x speedup) | Low | Low | Selected |
-| 2 | `atom.audio.chatterbox.vllm_backend._split_text` | Python | Performance / Cleanliness | Low | Low | Rejected |
-| 3 | `atom.entrypoints.openai.api_server._normalize_embedding_inputs` | Python | Performance / Robustness | Low | Low | Rejected |
-| 4 | `atom.entrypoints.openai.serving_speech._validate_path_within_directory` | Python | Safety / Performance | Low | Low | Rejected |
-| 5 | `atom.audio.lfm25_audio._pcm_chunks_to_wav_bytes` | Python | Memory overhead / latency | Medium | Medium | Rejected |
+| 1 | `ReasoningFilter` (`atom/entrypoints/openai/reasoning.py`) | Python | Lower latency in token streaming loop | Medium | Low | Selected |
+| 2 | `ToolCallStreamParser` (`atom/entrypoints/openai/tool_parser.py`) | Python | Lower latency in token streaming loop | High | Medium | Rejected (already has `parse_tool_calls` in Rust, streaming parser state machine complex due to JSON accumulation) |
+| 3 | `stable_hash` (`atom/utils/hash.py`) | Python fallback | High performance hashing | Low | Low | Rejected (already uses Rust under the hood via `atom_rust.compute_bytes_hash`) |
+| 4 | `mean_pool_embeddings` (`atom/retrieval/colbert.py`) | Python (PyTorch) | Lower memory/latency | Medium | Medium | Rejected (memory notes say "Avoid rewriting PyTorch-based tensor operations in pure Rust.") |
+| 5 | `maxsim_score` (`atom/retrieval/colbert.py`) | Python (PyTorch) | Lower memory/latency | Medium | Medium | Rejected (memory notes say "Avoid rewriting PyTorch-based tensor operations in pure Rust.") |
 
 ## Selected Candidate
 
-- Path: `atom/entrypoints/openai/tool_parser.py` (specifically `parse_tool_calls` and `_parse_tool_call_entries`)
-- Current implementation: Uses Python `re` module with multiple passes and regex compilations to extract function calls embedded as special tokens.
-- Rust replacement: Pure Rust implementation added to the existing `atom_rust` PyO3 extension crate (`rust_bindings`), using direct string searching (`find()`) instead of regex.
-- Reason selected: Tool parsing executes on the critical path for language model serving when tool use is enabled. Using regex inside a loop for thousands of potential tool chunks has a notable overhead. The Rust version is ~3.1x faster and avoids recompiling and executing complex regex patterns.
+- Path: `atom/entrypoints/openai/reasoning.py`
+- Current implementation: `ReasoningFilter` (pure Python state machine using `str.split()` and slicing).
+- Rust replacement: Add `ReasoningFilter` pyclass to `atom_rust` crate.
+- Reason selected: Directly executed in the token generation streaming hot loop (`serving_chat.py`). Pure string matching without requiring external dependencies or async boundaries.
 
 ## Implementation Summary
 
-Added `parse_tool_calls` and `parse_tool_call_entries` to `rust_bindings/src/lib.rs`.
-Modified `atom/entrypoints/openai/tool_parser.py` to optionally import and use `atom_rust.parse_tool_calls`, falling back to the original Python regex logic if the Rust binding is unavailable.
+Added `ReasoningFilter` as a `#[pyclass]` in the existing `rust_bindings` crate. It stores a state (`u8`) and a buffer (`String`). The `process` method modifies the internal state and string buffer and yields a `PyList` of `(field_name, text)` tuples. The `flush` method emits any remaining buffered text. The Python `ReasoningFilter` has been updated to dynamically import `atom_rust` and delegate execution to the native class if available, maintaining strict backward compatibility if the compiled extension isn't present.
 
 ## Before Benchmark
-
-526.24 ms for 10 iterations of a string containing 5000 tool calls.
+- `python benchmark_reasoning_isolated.py`
+- 183.90 ms (220k iterations)
 
 ## After Benchmark
-
-170.21 ms for 10 iterations of a string containing 5000 tool calls.
+- `python benchmark_reasoning_rust.py`
+- 133.19 ms (220k iterations)
 
 ## Benchmark Delta
-
-67.66% improvement (3.1x speedup).
+- -27.57% (27.57% faster execution of the text parsing loop)
 
 ## Tests Run
-
-Manually tested functionality with identical behavior via Python and Rust.
+- `pytest tests/entrypoints/test_reasoning.py`
+- Pass
 
 ## Files Changed
-
 - `rust_bindings/src/lib.rs`
-- `rust_bindings/Cargo.toml`
-- `atom/entrypoints/openai/tool_parser.py`
+- `rust_bindings/src/reasoning.rs`
+- `atom/entrypoints/openai/reasoning.py`
 
 ## Compatibility Notes
-
-The system gracefully falls back to the original pure Python implementation if the `atom_rust` crate cannot be loaded or is out of date. The Python fallback is fully intact and unmodified from its original form.
+- The Python implementation has been preserved as a transparent fallback in `ReasoningFilter` when `atom_rust` is not installed or when `atom_rust.ReasoningFilter` is absent.
 
 ## Remaining Follow-Ups
-
-- Optimize the `ToolCallStreamParser` as well to utilize a Rust-backed state machine.
-- Eliminate deprecated `pyo3::types::PyDict::new` usage when PyO3 is updated.
+- None.
