@@ -1,9 +1,11 @@
 {
-  "candidate": "atom/entrypoints/openai/tool_parser.py:ToolCallStreamParser",
+  "candidate": "atom.entrypoints.openai.tool_parser.ToolCallStreamParser",
   "implementation": "after",
-  "command": "python benchmark_tool_parser_rust_standalone.py",
-  "timestamp": "2026-05-23T14:09:19Z",
-  "iterations": 12000,
-  "input_description": "List of 12000 tool call tokens",
-  "duration_ms": 2.2509098052978516
+  "command": "python3 run_benchmark.py",
+  "timestamp": "2026-05-23T11:49:08.723066Z",
+  "iterations": 1,
+  "input_description": "5000 iterations of 10 chunks containing tool call section with 2 tool calls",
+  "duration_ms": 5.561351776123047,
+  "throughput": "5000 iterations",
+  "notes": "Stream parsing"
 }

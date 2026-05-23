@@ -1,3 +1,4 @@
+mod tool_parser;
 mod reasoning;
 
 use ignore::WalkBuilder;
@@ -150,4 +151,3 @@ fn atom_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<tool_parser::ToolCallStreamParser>()?;
     Ok(())
 }
-mod tool_parser;
