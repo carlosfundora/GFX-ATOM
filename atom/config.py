@@ -3,7 +3,7 @@
 
 import enum
 import fnmatch
-import hashlib
+from atom.utils.hash import stable_hash
 import logging
 import os
 import re
@@ -248,7 +248,7 @@ class CompilationConfig:
         factors.append(self.cudagraph_capture_sizes)
         factors.append(self.cuda_graph_sizes)
 
-        return hashlib.sha256(str(factors).encode()).hexdigest()
+        return stable_hash(str(factors))
 
     def set_splitting_ops_for_v1(self):
         # NOTE: this function needs to be called only when level is
@@ -370,7 +370,7 @@ class QuantizationConfig:
         factors.append(self.global_spec)
         factors.append(self.layer_pattern_specs)
         factors.append(self.exclude_layers)
-        hash_value = hashlib.sha256(str(factors).encode()).hexdigest()
+        hash_value = stable_hash(str(factors))
         return hash_value
 
     def get_name(self):
@@ -713,7 +713,7 @@ class ParallelConfig:
         factors.append(self.data_parallel_rank_local)
         factors.append(self.data_parallel_master_ip)
         factors.append(self.data_parallel_master_port)
-        return hashlib.sha256(str(factors).encode()).hexdigest()
+        return stable_hash(str(factors))
 
     def __post_init__(self) -> None:
         # Only override with env vars if explicitly set.
@@ -1041,9 +1041,9 @@ class Config:
         factors.append(self.tensor_parallel_size)
         factors.append(self.enable_dp_attention)
 
-        hash_str = hashlib.md5(
-            str(factors).encode(), usedforsecurity=False
-        ).hexdigest()[:10]
+        hash_str = stable_hash(
+            str(factors)
+        )[:10]
         return hash_str
 
 

@@ -1,4 +1,4 @@
-use numpy::{IntoPyArray, PyReadonlyArray1};
+use numpy::{IntoPyArray, PyArray2, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::prelude::*;
 use numpy::ndarray::Array1;
 
@@ -237,8 +237,6 @@ impl SentenceSplitter {
 }
 
 
-use numpy::{PyArray2, PyArrayMethods, PyReadonlyArray2};
-
 #[pyfunction]
 fn rep_penalty_kernel(
     _py: Python,
@@ -283,5 +281,27 @@ fn rs_codec(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(audio_to_pcm_bytes, m)?)?;
     m.add_function(wrap_pyfunction!(rep_penalty_kernel, m)?)?;
     m.add_class::<SentenceSplitter>()?;
+    m.add_function(wrap_pyfunction!(np_rep_penalty, m)?)?;
     Ok(())
+}
+
+#[pyfunction]
+fn np_rep_penalty(_py: Python, scores: &Bound<'_, PyArray2<f32>>, input_ids: &Bound<'_, PyArray2<i64>>, penalty: f32) {
+    let mut scores_mut = unsafe { scores.as_array_mut() };
+    let ids_view = unsafe { input_ids.as_array() };
+
+    let batch_size = ids_view.shape()[0];
+    let seq_len = ids_view.shape()[1];
+
+    for b in 0..batch_size {
+        for i in 0..seq_len {
+            let id = ids_view[[b, i]] as usize;
+            let val = scores_mut[[b, id]];
+            if val < 0.0 {
+                scores_mut[[b, id]] = val * penalty;
+            } else {
+                scores_mut[[b, id]] = val / penalty;
+            }
+        }
+    }
 }

@@ -3,7 +3,7 @@
 
 import contextlib
 import copy
-import hashlib
+from atom.utils.hash import stable_hash
 import os
 from contextlib import ExitStack
 from typing import Any, Callable, Optional
@@ -186,9 +186,9 @@ class InductorAdaptor(CompilerInterface):
 
     def compute_hash(self, vllm_config: Config) -> str:
         factors = get_inductor_factors()
-        hash_str = hashlib.md5(
-            str(factors).encode(), usedforsecurity=False
-        ).hexdigest()[:10]
+        hash_str = stable_hash(
+            str(factors)
+        )[:10]
         return hash_str
 
     def initialize_cache(
@@ -532,9 +532,9 @@ class InductorStandaloneAdaptor(CompilerInterface):
 
     def compute_hash(self, vllm_config: Config) -> str:
         factors = get_inductor_factors()
-        hash_str = hashlib.md5(
-            str(factors).encode(), usedforsecurity=False
-        ).hexdigest()[:10]
+        hash_str = stable_hash(
+            str(factors)
+        )[:10]
         return hash_str
 
     def initialize_cache(

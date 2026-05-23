@@ -11,19 +11,12 @@ by adding inputs_embeds support to the request pipeline.
 """
 
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
-import os
-
-try:
-    import rs_codec
-    _HAS_RS_CODEC = True
-except ImportError:
-    _HAS_RS_CODEC = False
-
 import torch
 import torch.nn.functional as F
 
@@ -57,11 +50,17 @@ class RepetitionPenaltyProcessor:
         self.penalty = penalty
 
     def __call__(self, input_ids: torch.Tensor, scores: torch.Tensor) -> torch.Tensor:
+        if input_ids.shape[0] == 1:
+            ids = input_ids[0]
+            s = scores[0, ids]
+            s.mul_(torch.where(s < 0, self.penalty, 1.0 / self.penalty))
+            scores[0, ids] = s
+            return scores
+
         score = torch.gather(scores, 1, input_ids)
-        score = torch.where(score < 0, score * self.penalty, score / self.penalty)
-        scores_processed = scores.clone()
-        scores_processed.scatter_(1, input_ids, score)
-        return scores_processed
+        score.mul_(torch.where(score < 0, self.penalty, 1.0 / self.penalty))
+        scores.scatter_(1, input_ids, score)
+        return scores
 
 
 class ChatterboxEngine:
@@ -266,9 +265,7 @@ class ChatterboxEngine:
         temperature: float,
     ) -> np.ndarray:
         """Autoregressive generation on GPU using HuggingFace model."""
-        inputs_embeds = torch.from_numpy(prep["inputs_embeds"]).to(
-            device=self.device, dtype=self.dtype
-        )
+        inputs_embeds = torch.as_tensor(prep["inputs_embeds"], device=self.device, dtype=self.dtype)
 
         rep_penalty = RepetitionPenaltyProcessor(repetition_penalty)
 
@@ -380,6 +377,10 @@ class ChatterboxEngine:
 
         next_token = None
         seq_len = inputs_embeds.shape[1]
+
+        if needs_position_ids:
+            pos_ids_full = np.arange(seq_len + max_tokens, dtype=np.int64)[np.newaxis, :]
+
         for i in range(max_tokens):
             if i == 0:
                 cur_embeds = inputs_embeds
@@ -399,10 +400,9 @@ class ChatterboxEngine:
             }
             if needs_position_ids:
                 if i == 0:
-                    pos_ids = np.arange(seq_len, dtype=np.int64)[np.newaxis, :]
+                    llm_inputs["position_ids"] = pos_ids_full[:, :seq_len]
                 else:
-                    pos_ids = np.array([[current_seq_len - 1]], dtype=np.int64)
-                llm_inputs["position_ids"] = pos_ids
+                    llm_inputs["position_ids"] = pos_ids_full[:, current_seq_len - 1:current_seq_len]
 
             logits, *present_kvs = llm.run(None, llm_inputs)
             logits = logits[:, -1, :]
@@ -428,10 +428,24 @@ class ChatterboxEngine:
         return tokens
     @staticmethod
     def _np_rep_penalty(input_ids, scores, penalty):
-        if _HAS_RS_CODEC and os.environ.get("RUST_REP_PENALTY", "1") == "1":
+        if (
+            _HAS_RS_CODEC
+            and os.environ.get("RUST_REP_PENALTY", "1") == "1"
+            and hasattr(rs_codec, "rep_penalty_kernel")
+        ):
             rs_codec.rep_penalty_kernel(scores, input_ids, penalty)
             return scores
+        if _HAS_RS_CODEC:
+            rs_codec.np_rep_penalty(scores, input_ids, penalty)
+            return scores
+        if input_ids.shape[0] == 1:
+            ids = input_ids[0]
+            s = scores[0, ids]
+            np.multiply(s, np.where(s < 0, penalty, 1.0 / penalty).astype(s.dtype), out=s)
+            scores[0, ids] = s
+            return scores
+
         score = np.take_along_axis(scores, input_ids, axis=1)
-        score = np.where(score < 0, score * penalty, score / penalty)
+        np.multiply(score, np.where(score < 0, penalty, 1.0 / penalty).astype(score.dtype), out=score)
         np.put_along_axis(scores, input_ids, score, axis=1)
         return scores

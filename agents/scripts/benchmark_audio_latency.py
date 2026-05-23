@@ -18,7 +18,8 @@ def benchmark_pcm_conversion():
 
     # Pure Python
     t0 = time.perf_counter()
-    pcm_data = (audio * 32767).clip(-32768, 32767).astype(np.int16)
+    pcm_data = np.empty_like(audio, dtype=np.int16)
+    np.clip(audio * 32767, -32768, 32767, out=pcm_data, casting='unsafe')
     pcm_bytes_py = pcm_data.tobytes()
     t1 = time.perf_counter()
     py_time = (t1 - t0) * 1000

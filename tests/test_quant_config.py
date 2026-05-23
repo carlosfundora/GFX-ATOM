@@ -141,6 +141,8 @@ def _load_module(filename: str, module_name: str):
 _qs = _load_module("quant_spec.py", "atom.quant_spec")
 sys.modules["atom.quant_spec"] = _qs
 
+_uh = _load_module("utils/hash.py", "atom.utils.hash")
+sys.modules["atom.utils.hash"] = _uh
 _m = _load_module("config.py", "_atom_config_test")
 
 QuantizationConfig = _m.QuantizationConfig
@@ -561,7 +563,7 @@ class TestComputeHash:
         h1 = qcfg.compute_hash()
         h2 = qcfg.compute_hash()
         assert h1 == h2
-        assert isinstance(h1, str) and len(h1) == 64
+        assert isinstance(h1, str) and len(h1) == 32
 
     def test_different_configs_produce_different_hashes(self):
         qcfg1 = QuantizationConfig(config=None)

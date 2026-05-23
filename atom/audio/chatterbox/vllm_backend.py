@@ -670,7 +670,15 @@ class ChatterboxAtomVllmEngine:
             metrics["requested_backend"] = "atom_vllm"
             return wav, metrics
 
-        wav = np.concatenate(audio_chunks) if audio_chunks else np.zeros(0, dtype=np.float32)
+        if audio_chunks:
+            total_len = sum(len(c) for c in audio_chunks)
+            wav = np.empty(total_len, dtype=np.float32)
+            offset = 0
+            for c in audio_chunks:
+                wav[offset:offset+len(c)] = c
+                offset += len(c)
+        else:
+            wav = np.zeros(0, dtype=np.float32)
         total_sec = time.time() - t0
         duration = len(wav) / max(self.sample_rate, 1)
         metrics = {

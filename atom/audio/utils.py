@@ -85,19 +85,18 @@ def audio_to_bytes(
 
     sf_format, media_type, kwargs = format_map[response_format]
 
-    buf = io.BytesIO()
     if response_format == "pcm":
         # Raw 16-bit PCM (Optimized via Rust)
         if _HAS_RS_CODEC:
-            pcm_bytes = rs_codec.audio_to_pcm_bytes(audio)
-            buf.write(pcm_bytes)
+            return rs_codec.audio_to_pcm_bytes(audio), media_type
         else:
-            pcm_data = (audio * 32767).clip(-32768, 32767).astype(np.int16)
-            buf.write(pcm_data.tobytes())
+            pcm_data = np.empty_like(audio, dtype=np.int16)
+            np.clip(audio * 32767, -32768, 32767, out=pcm_data, casting='unsafe')
+            return pcm_data.tobytes(), media_type
     else:
+        buf = io.BytesIO()
         sf.write(buf, audio, sample_rate, format=sf_format, **kwargs)
-
-    return buf.getvalue(), media_type
+        return buf.getvalue(), media_type
 
 
 def apply_speed_adjustment(
@@ -127,8 +126,8 @@ def apply_speed_adjustment(
 
     try:
         with torch.inference_mode():
-            if not np.issubdtype(audio.dtype, np.floating):
-                audio = audio.astype(np.float32)
+            if audio.dtype != np.float32:
+                audio = audio.astype(np.float32, copy=False)
 
             # Stereo numpy arrays use channels-last (T, C);
             # torch expects channels-first (C, T).

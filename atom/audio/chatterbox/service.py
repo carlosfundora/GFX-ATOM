@@ -126,13 +126,8 @@ class ChatterboxService:
         if voice_path.exists():
             audio_values, sr = sf.read(str(voice_path), dtype="float32")
             if sr != SAMPLE_RATE:
-                ratio = SAMPLE_RATE / sr
-                new_len = int(len(audio_values) * ratio)
-                audio_values = np.interp(
-                    np.linspace(0, len(audio_values) - 1, new_len),
-                    np.arange(len(audio_values)),
-                    audio_values,
-                ).astype(np.float32)
+                import soxr
+                audio_values = soxr.resample(audio_values, sr, SAMPLE_RATE).astype(np.float32)
             self._default_voice = audio_values[np.newaxis, :].astype(np.float32)
             logger.info("Loaded default voice: %.1fs", len(audio_values) / SAMPLE_RATE)
 
@@ -159,13 +154,8 @@ class ChatterboxService:
         elif audio_path is not None:
             audio_values, sr = sf.read(audio_path, dtype="float32")
             if sr != SAMPLE_RATE:
-                ratio = SAMPLE_RATE / sr
-                new_len = int(len(audio_values) * ratio)
-                audio_values = np.interp(
-                    np.linspace(0, len(audio_values) - 1, new_len),
-                    np.arange(len(audio_values)),
-                    audio_values,
-                ).astype(np.float32)
+                import soxr
+                audio_values = soxr.resample(audio_values, sr, SAMPLE_RATE).astype(np.float32)
             audio_values = audio_values[np.newaxis, :].astype(np.float32)
         else:
             if self._default_voice is None:
