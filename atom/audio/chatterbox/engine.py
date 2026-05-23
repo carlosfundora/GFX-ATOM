@@ -428,6 +428,9 @@ class ChatterboxEngine:
 
     @staticmethod
     def _np_rep_penalty(input_ids, scores, penalty):
+        if _HAS_RS_CODEC:
+            rs_codec.np_rep_penalty(scores, input_ids, penalty)
+            return scores
         if input_ids.shape[0] == 1:
             ids = input_ids[0]
             s = scores[0, ids]
