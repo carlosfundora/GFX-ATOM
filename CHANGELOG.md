@@ -2,6 +2,14 @@
 
 All notable changes to gfxATOM are documented in this file.
 
+## [Unreleased] — 2026-05-19
+
+### Verified — Rebuild audit (ATOM / gfxATOM-Rust / build-kernels)
+
+- Audited `/home/local/ai/build/wip/ATOM` against active WIP dependencies and recent ROCm wheel/kernel forward-ports.
+- Confirmed local dirt is limited to `rust_bindings/target/flycheck0/*` generated outputs (no source drift requiring rebuild).
+- No ATOM source rebuild was required from this audit pass.
+
 ## [Unreleased] — 2026-05-13
 
 ### Added — Kernel Backend Expansion (Wave 1)

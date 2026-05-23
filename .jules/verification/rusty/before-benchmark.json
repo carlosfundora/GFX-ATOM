@@ -1,11 +1,9 @@
 {
-  "candidate": "atom.entrypoints.openai.tool_parser.ToolCallStreamParser",
+  "candidate": "atom.audio.chatterbox.engine._np_rep_penalty",
   "implementation": "before",
-  "command": "python3 run_benchmark.py",
-  "timestamp": "2026-05-23T11:49:08.716948Z",
-  "iterations": 1,
-  "input_description": "5000 iterations of 10 chunks containing tool call section with 2 tool calls",
-  "duration_ms": 6.22868537902832,
-  "throughput": "5000 iterations",
-  "notes": "Stream parsing"
+  "command": "python test_np_rep_penalty_benchmark.py",
+  "timestamp": "2026-05-20T04:12:56",
+  "iterations": 10000,
+  "input_description": "Batch 1, vocab 32000, seq 512",
+  "duration_ms": 464.9393558502197
 }

@@ -11,6 +11,7 @@ by adding inputs_embeds support to the request pipeline.
 """
 
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Optional
@@ -52,12 +53,12 @@ class RepetitionPenaltyProcessor:
         if input_ids.shape[0] == 1:
             ids = input_ids[0]
             score = scores[0, ids]
-            score.mul_(torch.where(score < 0, self.penalty, 1.0 / self.penalty).to(score.dtype))
+            torch.where(score < 0, score * self.penalty, score / self.penalty, out=score)
             scores[0, ids] = score
             return scores
 
         score = torch.gather(scores, 1, input_ids)
-        score.mul_(torch.where(score < 0, self.penalty, 1.0 / self.penalty).to(score.dtype))
+        torch.where(score < 0, score * self.penalty, score / self.penalty, out=score)
         scores.scatter_(1, input_ids, score)
         return scores
 
@@ -425,20 +426,30 @@ class ChatterboxEngine:
             tokens = tokens[:, :-1]
 
         return tokens
-
     @staticmethod
     def _np_rep_penalty(input_ids, scores, penalty):
+        if (
+            _HAS_RS_CODEC
+            and os.environ.get("RUST_REP_PENALTY", "1") == "1"
+            and hasattr(rs_codec, "rep_penalty_kernel")
+        ):
+            rs_codec.rep_penalty_kernel(scores, input_ids, penalty)
+            return scores
         if _HAS_RS_CODEC:
             rs_codec.np_rep_penalty(scores, input_ids, penalty)
             return scores
         if input_ids.shape[0] == 1:
             ids = input_ids[0]
             s = scores[0, ids]
-            np.multiply(s, np.where(s < 0, penalty, 1.0 / penalty).astype(s.dtype), out=s)
+            mask = s < 0
+            s[mask] = (s[mask] * penalty).astype(scores.dtype)
+            s[~mask] = (s[~mask] / penalty).astype(scores.dtype)
             scores[0, ids] = s
             return scores
 
         score = np.take_along_axis(scores, input_ids, axis=1)
-        np.multiply(score, np.where(score < 0, penalty, 1.0 / penalty).astype(score.dtype), out=score)
+        mask = score < 0
+        score[mask] = (score[mask] * penalty).astype(scores.dtype)
+        score[~mask] = (score[~mask] / penalty).astype(scores.dtype)
         np.put_along_axis(scores, input_ids, score, axis=1)
         return scores

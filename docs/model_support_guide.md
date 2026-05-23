@@ -28,8 +28,6 @@ support_model_arch_dict = {
 
 ATOM resolves the HuggingFace `architectures` field from a model's `config.json` against this dictionary. If the architecture string matches a key, ATOM imports and instantiates the corresponding class.
 
-**Retrieval-only models:** `Lfm2Model`-based ColBERT checkpoints are not loaded through `ModelRunner`. They are routed through the dedicated `atom.retrieval.colbert.ColbertService`, which powers `/v1/embeddings` and `/v1/rerank` using the local registry metadata plus the CPU HF model files.
-
 ### Kernel backend selector (phase 1)
 
 Model ops can be routed through the kernel backend selector via environment variables in `atom.utils.envs`:
