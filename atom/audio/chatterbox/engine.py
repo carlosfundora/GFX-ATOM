@@ -51,13 +51,13 @@ class RepetitionPenaltyProcessor:
     def __call__(self, input_ids: torch.Tensor, scores: torch.Tensor) -> torch.Tensor:
         if input_ids.shape[0] == 1:
             ids = input_ids[0]
-            s = scores[0, ids]
-            s.mul_(torch.where(s < 0, self.penalty, 1.0 / self.penalty))
-            scores[0, ids] = s
+            score = scores[0, ids]
+            torch.where(score < 0, score * self.penalty, score / self.penalty, out=score)
+            scores[0, ids] = score
             return scores
 
         score = torch.gather(scores, 1, input_ids)
-        score.mul_(torch.where(score < 0, self.penalty, 1.0 / self.penalty))
+        torch.where(score < 0, score * self.penalty, score / self.penalty, out=score)
         scores.scatter_(1, input_ids, score)
         return scores
 
@@ -434,11 +434,15 @@ class ChatterboxEngine:
         if input_ids.shape[0] == 1:
             ids = input_ids[0]
             s = scores[0, ids]
-            np.multiply(s, np.where(s < 0, penalty, 1.0 / penalty).astype(s.dtype), out=s)
+            mask = s < 0
+            s[mask] = (s[mask] * penalty).astype(scores.dtype)
+            s[~mask] = (s[~mask] / penalty).astype(scores.dtype)
             scores[0, ids] = s
             return scores
 
         score = np.take_along_axis(scores, input_ids, axis=1)
-        np.multiply(score, np.where(score < 0, penalty, 1.0 / penalty).astype(score.dtype), out=score)
+        mask = score < 0
+        score[mask] = (score[mask] * penalty).astype(scores.dtype)
+        score[~mask] = (score[~mask] / penalty).astype(scores.dtype)
         np.put_along_axis(scores, input_ids, score, axis=1)
         return scores
