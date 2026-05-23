@@ -105,8 +105,6 @@ def _parse_tool_call_entries(section_text: str) -> List[ToolCall]:
         )
     return tool_calls
 
-
-
 try:
     import atom_rust
     if hasattr(atom_rust, 'ToolCallStreamParser'):
