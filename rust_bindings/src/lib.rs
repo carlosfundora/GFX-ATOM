@@ -1,3 +1,4 @@
+mod tool_parser;
 mod reasoning;
 
 use ignore::WalkBuilder;
@@ -147,5 +148,6 @@ fn atom_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(find_files, m)?)?;
     m.add_function(wrap_pyfunction!(parse_tool_calls, m)?)?;
     m.add_class::<reasoning::ReasoningFilter>()?;
+    m.add_class::<tool_parser::ToolCallStreamParser>()?;
     Ok(())
 }

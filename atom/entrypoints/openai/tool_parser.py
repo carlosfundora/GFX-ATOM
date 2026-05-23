@@ -106,118 +106,126 @@ def _parse_tool_call_entries(section_text: str) -> List[ToolCall]:
     return tool_calls
 
 
-@dataclass
-class ToolCallStreamParser:
-    """Stateful streaming parser for tool call special tokens.
 
-    Processes text chunks and emits structured events:
-    - ("content", text) — regular content before tool calls
-    - ("tool_call_start", {"index": N, "id": ..., "function": {"name": ..., "arguments": ""}})
-    - ("tool_call_args", {"index": N, "function": {"arguments": chunk}})
-    - ("tool_call_end", None) — all tool calls complete
+try:
+    import atom_rust
+    if hasattr(atom_rust, 'ToolCallStreamParser'):
+        ToolCallStreamParser = atom_rust.ToolCallStreamParser
+    else:
+        raise ImportError
+except ImportError:
+    @dataclass
+    class ToolCallStreamParser:
+        """Stateful streaming parser for tool call special tokens.
 
-    States:
-        0 = normal content (no tool call tokens seen)
-        1 = inside tool_calls_section (buffering)
-        2 = done (after tool_calls_section_end)
-    """
+        Processes text chunks and emits structured events:
+        - ("content", text) — regular content before tool calls
+        - ("tool_call_start", {"index": N, "id": ..., "function": {"name": ..., "arguments": ""}})
+        - ("tool_call_args", {"index": N, "function": {"arguments": chunk}})
+        - ("tool_call_end", None) — all tool calls complete
 
-    state: int = 0
-    buf: str = ""
-    current_index: int = 0
-    _emitted_calls: int = 0
+        States:
+            0 = normal content (no tool call tokens seen)
+            1 = inside tool_calls_section (buffering)
+            2 = done (after tool_calls_section_end)
+        """
 
-    def process(self, text: str) -> list:
-        """Process a text chunk and return list of (event_type, data) tuples."""
-        results = []
+        state: int = 0
+        buf: str = ""
+        current_index: int = 0
+        _emitted_calls: int = 0
 
-        if self.state == 0:
-            self.buf += text
-            if "<|tool_calls_section_begin|>" in self.buf:
-                before = self.buf.split("<|tool_calls_section_begin|>")[0]
-                if before:
-                    results.append(("content", before))
-                self.state = 1
-                self.buf = self.buf.split("<|tool_calls_section_begin|>", 1)[1]
-                # Process any complete tool calls already in buffer
-                results.extend(self._process_buffer())
-            elif "<|tool" not in self.buf and len(self.buf) > 30:
-                # Safe to emit as content
-                results.append(("content", self.buf))
-                self.buf = ""
+        def process(self, text: str) -> list:
+            """Process a text chunk and return list of (event_type, data) tuples."""
+            results = []
 
-        elif self.state == 1:
-            self.buf += text
-            if "<|tool_calls_section_end|>" in self.buf:
-                # Process remaining before end
-                remaining = self.buf.split("<|tool_calls_section_end|>")[0]
-                self.buf = remaining
-                results.extend(self._process_buffer())
-                results.append(("tool_call_end", None))
-                self.state = 2
-                self.buf = ""
-            else:
-                results.extend(self._process_buffer())
+            if self.state == 0:
+                self.buf += text
+                if "<|tool_calls_section_begin|>" in self.buf:
+                    before = self.buf.split("<|tool_calls_section_begin|>")[0]
+                    if before:
+                        results.append(("content", before))
+                    self.state = 1
+                    self.buf = self.buf.split("<|tool_calls_section_begin|>", 1)[1]
+                    # Process any complete tool calls already in buffer
+                    results.extend(self._process_buffer())
+                elif "<|tool" not in self.buf and len(self.buf) > 30:
+                    # Safe to emit as content
+                    results.append(("content", self.buf))
+                    self.buf = ""
 
-        # state 2: done, ignore further input
+            elif self.state == 1:
+                self.buf += text
+                if "<|tool_calls_section_end|>" in self.buf:
+                    # Process remaining before end
+                    remaining = self.buf.split("<|tool_calls_section_end|>")[0]
+                    self.buf = remaining
+                    results.extend(self._process_buffer())
+                    results.append(("tool_call_end", None))
+                    self.state = 2
+                    self.buf = ""
+                else:
+                    results.extend(self._process_buffer())
 
-        return results
+            # state 2: done, ignore further input
 
-    def _process_buffer(self) -> list:
-        """Extract complete tool call entries from the buffer."""
-        results = []
-        while "<|tool_call_begin|>" in self.buf and "<|tool_call_end|>" in self.buf:
-            # Extract one complete tool call
-            match = re.search(
-                r"<\|tool_call_begin\|>"
-                r"functions\.(\w+):(\d+)"
-                r"<\|tool_call_argument_begin\|>"
-                r"(.*?)"
-                r"<\|tool_call_end\|>",
-                self.buf,
-                re.DOTALL,
-            )
-            if not match:
-                break
+            return results
 
-            name = match.group(1)
-            index = int(match.group(2))
-            arguments = match.group(3).strip()
-
-            call_id = f"call_{uuid.uuid4().hex[:8]}"
-            results.append(
-                (
-                    "tool_call_start",
-                    {
-                        "index": index,
-                        "id": call_id,
-                        "type": "function",
-                        "function": {"name": name, "arguments": ""},
-                    },
+        def _process_buffer(self) -> list:
+            """Extract complete tool call entries from the buffer."""
+            results = []
+            while "<|tool_call_begin|>" in self.buf and "<|tool_call_end|>" in self.buf:
+                # Extract one complete tool call
+                match = re.search(
+                    r"<\|tool_call_begin\|>"
+                    r"functions\.(\w+):(\d+)"
+                    r"<\|tool_call_argument_begin\|>"
+                    r"(.*?)"
+                    r"<\|tool_call_end\|>",
+                    self.buf,
+                    re.DOTALL,
                 )
-            )
-            if arguments:
+                if not match:
+                    break
+
+                name = match.group(1)
+                index = int(match.group(2))
+                arguments = match.group(3).strip()
+
+                call_id = f"call_{uuid.uuid4().hex[:8]}"
                 results.append(
                     (
-                        "tool_call_args",
-                        {"index": index, "function": {"arguments": arguments}},
+                        "tool_call_start",
+                        {
+                            "index": index,
+                            "id": call_id,
+                            "type": "function",
+                            "function": {"name": name, "arguments": ""},
+                        },
                     )
                 )
+                if arguments:
+                    results.append(
+                        (
+                            "tool_call_args",
+                            {"index": index, "function": {"arguments": arguments}},
+                        )
+                    )
 
-            self.buf = self.buf[match.end() :]
-            self._emitted_calls += 1
+                self.buf = self.buf[match.end() :]
+                self._emitted_calls += 1
 
-        return results
+            return results
 
-    def flush(self) -> list:
-        """Flush remaining buffer content."""
-        results = []
-        if self.state == 0 and self.buf:
-            results.append(("content", self.buf))
-            self.buf = ""
-        elif self.state == 1:
-            # Unclosed tool calls section — try to parse what we have
-            results.extend(self._process_buffer())
-            if self._emitted_calls > 0:
-                results.append(("tool_call_end", None))
-        return results
+        def flush(self) -> list:
+            """Flush remaining buffer content."""
+            results = []
+            if self.state == 0 and self.buf:
+                results.append(("content", self.buf))
+                self.buf = ""
+            elif self.state == 1:
+                # Unclosed tool calls section — try to parse what we have
+                results.extend(self._process_buffer())
+                if self._emitted_calls > 0:
+                    results.append(("tool_call_end", None))
+            return results

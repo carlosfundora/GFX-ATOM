@@ -1,9 +1,11 @@
 {
-  "candidate": "atom/entrypoints/openai/reasoning.py:ReasoningFilter",
+  "candidate": "atom.entrypoints.openai.tool_parser.ToolCallStreamParser",
   "implementation": "after",
-  "command": "python benchmark_reasoning_rust.py",
-  "timestamp": "2026-05-22T10:14:02Z",
-  "iterations": 220000,
-  "input_description": "220000 small streaming chunks with thinking blocks",
-  "duration_ms": 133.1877779999786
+  "command": "python3 run_benchmark.py",
+  "timestamp": "2026-05-23T11:49:08.723066Z",
+  "iterations": 1,
+  "input_description": "5000 iterations of 10 chunks containing tool call section with 2 tool calls",
+  "duration_ms": 5.561351776123047,
+  "throughput": "5000 iterations",
+  "notes": "Stream parsing"
 }

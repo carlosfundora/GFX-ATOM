@@ -1,8 +1,8 @@
-# Benchmark Summary
+# ToolCallStreamParser Benchmark Summary
 
-- Before Command: `python benchmark_reasoning_isolated.py`
-- After Command: `python benchmark_reasoning_rust.py`
-- Before Timing: 183.90 ms
-- After Timing: 133.19 ms
-- Percent Change: -27.57% (27.57% faster)
-- Notes: Benchmarked 220,000 small streaming chunks simulating the token-by-token output of an autoregressive reasoning model (containing `<think>` blocks). The new rust native extension for `ReasoningFilter` significantly improves parsing throughput.
+- Before Command: python3 run_benchmark_standalone.py
+- After Command: python3 run_benchmark_standalone.py
+- Before Timing: 6.23 ms
+- After Timing: 5.56 ms
+- Percent Change: -10.71%
+- Notes: Rust implementation avoids expensive regex matching per iteration.
