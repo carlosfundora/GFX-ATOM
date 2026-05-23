@@ -2,6 +2,12 @@
 
 All notable changes to gfxATOM are documented in this file.
 
+## [Unreleased] — 2026-05-23
+
+### Changed
+
+- **Audio Repetition Penalty Optimization** (`atom/audio/chatterbox/engine.py`, `rs_codec/rs_codec/src/lib.rs`): Optimized the autoregressive repetition penalty hot loop in the Chatterbox TTS engine. The PyTorch path now writes `torch.where(..., out=score)` into the gathered score tensor, and the pure NumPy fallback explicitly casts masked updates back to the score dtype to avoid upcast failures. Mainline’s native `rs_codec.np_rep_penalty` path remains the first choice when the Rust extension is available.
+
 ## [Unreleased] — 2026-05-19
 
 ### Verified — Rebuild audit (ATOM / gfxATOM-Rust / build-kernels)
