@@ -50,7 +50,7 @@ def separate_reasoning(text: str) -> Tuple[Optional[str], str]:
 
 
 @dataclass
-class ReasoningFilter:
+class ReasoningFilterPy:
     """Stateful streaming filter that separates reasoning from content.
 
     Processes tokens one chunk at a time and yields (field, text) tuples
@@ -154,3 +154,8 @@ class ReasoningFilter:
                 results.append(("reasoning_content", self.buf))
             self.buf = ""
         return results
+
+try:
+    from atom_rust import ReasoningFilter as ReasoningFilter
+except ImportError:
+    ReasoningFilter = ReasoningFilterPy

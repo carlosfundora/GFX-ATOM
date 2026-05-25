@@ -8,5 +8,6 @@ members = [
     "crates/rs_turboquant_codec",
     "crates/rs_rotorquant_codec",
     "crates/rs_gguf_loader_core",
+    "crates/rs_atom_entrypoints_parsing",
 ]
 resolver = "2"

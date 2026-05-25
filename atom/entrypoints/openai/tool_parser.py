@@ -34,7 +34,7 @@ class ToolCall:
         return {"id": self.id, "type": self.type, "function": self.function}
 
 
-def parse_tool_calls(text: str) -> Tuple[str, List[ToolCall]]:
+def _parse_tool_calls_py(text: str) -> Tuple[str, List[ToolCall]]:
     """Parse tool calls from model output text.
 
     Args:
@@ -94,7 +94,7 @@ def _parse_tool_call_entries(section_text: str) -> List[ToolCall]:
 
 
 @dataclass
-class ToolCallStreamParser:
+class ToolCallStreamParserPy:
     """Stateful streaming parser for tool call special tokens.
 
     Processes text chunks and emits structured events:
@@ -208,3 +208,22 @@ class ToolCallStreamParser:
             if self._emitted_calls > 0:
                 results.append(("tool_call_end", None))
         return results
+
+try:
+    from atom_rust import ToolCallStreamParser as ToolCallStreamParser
+    from atom_rust import parse_tool_calls as _parse_tool_calls_rs
+
+    def parse_tool_calls(text: str) -> Tuple[str, List[ToolCall]]:
+        content, raw_tool_calls = _parse_tool_calls_rs(text)
+        tool_calls = [
+            ToolCall(
+                id=tc["id"],
+                type=tc["type"],
+                function=tc["function"]
+            )
+            for tc in raw_tool_calls
+        ]
+        return content, tool_calls
+except ImportError:
+    ToolCallStreamParser = ToolCallStreamParserPy
+    parse_tool_calls = _parse_tool_calls_py
