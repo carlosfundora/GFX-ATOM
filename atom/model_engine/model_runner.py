@@ -6,7 +6,8 @@ import math
 import os
 import time
 from contextlib import nullcontext
-from typing import Any, Optional, Union
+from collections import deque
+from typing import Any, Optional, Union, Deque, Tuple, Dict, Callable
 
 import numpy as np
 import torch
@@ -119,10 +120,10 @@ class tokenIDProcessor:
             copy_done.record(self.async_copy_stream)
         cpu_tensor_handle.append((cpu_tensor, copy_done))
 
-    def recv_async_output(self, cpu_tensor_handle) -> torch.Tensor:
+    def recv_async_output(self, cpu_tensor_handle: Deque) -> torch.Tensor:
         if not cpu_tensor_handle:
             return torch.empty(0, dtype=torch.int32, device="cpu")
-        cpu_tensor, event = cpu_tensor_handle.pop(0)
+        cpu_tensor, event = cpu_tensor_handle.popleft()
         event.synchronize()
         return cpu_tensor
 
@@ -138,7 +139,7 @@ class tokenIDProcessor:
     def recv_async_output_draft(self) -> np.ndarray:
         if not self.draft_token_ids_cpu:
             return np.array([], dtype=np.int32)
-        token_ids, event = self.draft_token_ids_cpu.pop(0)
+        token_ids, event = self.draft_token_ids_cpu.popleft()
         event.synchronize()
         return token_ids.numpy()
 
@@ -171,27 +172,25 @@ class tokenIDProcessor:
     ) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
         if not self.pending_mtp_status_copies:
             return None, None
-        cpu_num_rejected, cpu_num_bonus, copy_done = self.pending_mtp_status_copies.pop(
-            0
-        )
+        cpu_num_rejected, cpu_num_bonus, copy_done = self.pending_mtp_status_copies.popleft()
         copy_done.synchronize()
         return cpu_num_rejected.numpy(), cpu_num_bonus.numpy()
 
     def clean(self):
-        self.token_ids_cpu: list[torch.Tensor] = []
+        self.token_ids_cpu: Deque = deque()
 
         self.prev_batch: Optional[ScheduledBatch] = None
         self.prev_token_ids: Optional[torch.Tensor] = None
 
         self.pre_num_decode_token_per_seq = 1
         self.draft_token_ids: Optional[torch.Tensor] = None
-        self.draft_token_ids_cpu: list[torch.Tensor] = []
+        self.draft_token_ids_cpu: Deque = deque()
         # Queue of (cpu_num_rejected, cpu_num_bonus, copy_done_event) — async
         # D2H copies fired by send_mtp_status_to_cpu_async, drained by
         # recv_mtp_status_async after the event syncs.
-        self.pending_mtp_status_copies: list[
+        self.pending_mtp_status_copies: Deque[
             tuple[torch.Tensor, torch.Tensor, torch.cuda.Event]
-        ] = []
+        ] = deque()
         self.mapped_bonus_list: Optional[list[int]] = (
             None  # Mapped to current batch order
         )
