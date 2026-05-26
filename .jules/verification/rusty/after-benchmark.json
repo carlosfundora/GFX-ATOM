@@ -1,1 +1,0 @@
-{"candidate": "atom/entrypoints/openai/reasoning.py", "implementation": "after", "command": "python3 benchmarks/bench_reasoning.py", "timestamp": "2024-05-24T20:21:00Z", "iterations": 50000, "input_description": "Streaming thinking tokens", "duration_ms": 309}
