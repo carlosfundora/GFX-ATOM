@@ -1,3 +1,0 @@
-## 2024-05-17 - O(N) List Pop Bottleneck
-**Learning:** Found that several task and output tensor queues in `atom/model_engine/model_runner.py` (`token_ids_cpu`, `draft_token_ids_cpu`, `pending_mtp_status_copies`) were implemented using Python lists as FIFO queues with `list.pop(0)`. This causes an $O(N)$ shift operation every time a tensor or token is processed asynchronously, which can add up significantly during continuous streaming decode.
-**Action:** Always prefer `collections.deque` and `.popleft()` for any queue-like structures operating in hot loops, particularly those buffering cross-device (CPU-GPU) asynchronous operations.
