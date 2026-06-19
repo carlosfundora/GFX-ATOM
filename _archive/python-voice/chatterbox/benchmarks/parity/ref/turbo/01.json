@@ -1,0 +1,16 @@
+{
+  "variant": "turbo",
+  "side": "ref",
+  "ref_impl": "ChatterboxTurboTTS.from_local(cpu)",
+  "index": 1,
+  "text": "The quick brown fox jumps over the lazy dog.",
+  "params": {
+    "defaults": true,
+    "sampling": "stochastic (reference defaults)",
+    "seed": null
+  },
+  "load_s": 6.95,
+  "elapsed_s": 6.193,
+  "sr": 24000,
+  "audio_s": 2.88
+}

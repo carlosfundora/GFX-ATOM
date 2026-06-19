@@ -1,0 +1,17 @@
+{
+  "variant": "base",
+  "side": "ref",
+  "ref_impl": "ChatterboxMultilingualTTS.from_local(cpu, t3_mtl23ls_v2, language_id=en)",
+  "index": 0,
+  "text": "Hello there.",
+  "params": {
+    "defaults": true,
+    "sampling": "stochastic (reference defaults)",
+    "seed": null,
+    "language_id": "en"
+  },
+  "load_s": 9.25,
+  "elapsed_s": 6.885,
+  "sr": 24000,
+  "audio_s": 0.92
+}

@@ -1,0 +1,18 @@
+{
+  "variant": "base",
+  "side": "rust",
+  "index": 6,
+  "text": "The weather today is bright and clear, with a gentle breeze drifting in from the coast.",
+  "params": {
+    "decode": "greedy",
+    "seed": null
+  },
+  "cmd": "/home/local/ai/projects/rust/target/release/chatterbox_cli synthesize --manifest /home/local/ai/models/chatterbox-rs/base/manifest.json --text The weather today is bright and clear, with a gentle breeze drifting in from the coast. --voice default --voice-wav /home/local/ai/models/chatterbox-rs/base/default_voice.wav --out /home/local/ai/build/wip/chatterbox/benchmarks/parity/rust/base/06.wav --greedy --voice-cache /home/local/ai/build/wip/chatterbox/benchmarks/parity/voice_cache/base",
+  "wall_s": 82.962,
+  "engine_load_ms": 62891,
+  "first_token_ms": 402,
+  "generate_ms": 19661,
+  "audio_s": 5.64,
+  "sr": 24000,
+  "stderr_tail": "wrote /home/local/ai/build/wip/chatterbox/benchmarks/parity/rust/base/06.wav (5.64s @ 24000 Hz) | first_token=402ms generate=19661ms"
+}

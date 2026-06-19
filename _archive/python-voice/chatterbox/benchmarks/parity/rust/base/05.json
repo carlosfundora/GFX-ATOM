@@ -1,0 +1,18 @@
+{
+  "variant": "base",
+  "side": "rust",
+  "index": 5,
+  "text": "She sells seashells by the seashore.",
+  "params": {
+    "decode": "greedy",
+    "seed": null
+  },
+  "cmd": "/home/local/ai/projects/rust/target/release/chatterbox_cli synthesize --manifest /home/local/ai/models/chatterbox-rs/base/manifest.json --text She sells seashells by the seashore. --voice default --voice-wav /home/local/ai/models/chatterbox-rs/base/default_voice.wav --out /home/local/ai/build/wip/chatterbox/benchmarks/parity/rust/base/05.wav --greedy --voice-cache /home/local/ai/build/wip/chatterbox/benchmarks/parity/voice_cache/base",
+  "wall_s": 73.98,
+  "engine_load_ms": 62491,
+  "first_token_ms": 310,
+  "generate_ms": 10384,
+  "audio_s": 2.48,
+  "sr": 24000,
+  "stderr_tail": "wrote /home/local/ai/build/wip/chatterbox/benchmarks/parity/rust/base/05.wav (2.48s @ 24000 Hz) | first_token=310ms generate=10384ms"
+}
