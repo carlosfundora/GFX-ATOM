@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../ATOM-RS"
+		},
+		{
+			"path": "../ATOM"
+		}
+	],
+	"settings": {}
+}

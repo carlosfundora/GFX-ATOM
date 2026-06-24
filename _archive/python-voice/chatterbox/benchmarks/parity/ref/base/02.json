@@ -1,0 +1,17 @@
+{
+  "variant": "base",
+  "side": "ref",
+  "ref_impl": "ChatterboxMultilingualTTS.from_local(cpu, t3_mtl23ls_v2, language_id=en)",
+  "index": 2,
+  "text": "In 2024, the team shipped 17 releases and fixed 142 bugs.",
+  "params": {
+    "defaults": true,
+    "sampling": "stochastic (reference defaults)",
+    "seed": null,
+    "language_id": "en"
+  },
+  "load_s": 9.25,
+  "elapsed_s": 19.766,
+  "sr": 24000,
+  "audio_s": 5.64
+}

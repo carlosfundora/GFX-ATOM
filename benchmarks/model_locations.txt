@@ -1,0 +1,37 @@
+# Available models for benchmarking
+
+## Text Models
+1. OpenCoder-8B (GGUF)
+   Path: /home/local/ai/models/registry/QuantFactory/OpenCoder-8B-Instruct-GGUF/OpenCoder-8B-Instruct.Q4_K_M.gguf
+   Size: 8B params
+   Type: Code instruction model
+
+2. LFM2.5-1.2B (GGUF)
+   Path: /home/local/ai/models/registry/Community/mradermacher/LFM2.5-1.2B-Thinking-Claude-4.6-Opus-Heretic-Uncensored-DISTILL-GGUF/LFM2.5-1.2B-Thinking-Claude-4.6-Opus-Heretic-Uncensored-DISTILL.Q8_0.gguf
+   Size: 1.2B params
+   Type: Thinking model
+
+3. Bonsai-8B (GGUF)
+   Path: /home/local/ai/models/registry/PrismML/Bonsai-8B-gguf/Bonsai-8B.gguf
+   Size: 8B params
+   Type: General instruction model
+
+4. Qwen2.5-7B-Instruct (HuggingFace safetensors)
+   Path: /home/local/ai/models/registry/Qwen/Qwen2.5-7B-Instruct/weights/model-00001-of-00004.safetensors
+   Size: 7B params
+   Type: Code/Instruct model
+
+## Audio Models
+1. Chatterbox-Turbo (ONNX)
+   Path: /home/local/ai/models/huggingface/models--ResembleAI--chatterbox-turbo-ONNX/
+   Type: TTS model
+   Note: Audio round-trip testing required
+
+2. LFM2.5-Audio-1.5B (Research)
+   Path: /home/local/ai/models/liquidai/Resources/research/docs/docs/models/lfm25-audio-1.5b.mdx
+   Type: Audio model documentation
+
+## Compression Test Summary
+- Baseline: FP32 KV cache
+- TQ modes: TQ1 (high), TQ2 (standard), TQ3 (aggressive), TQ4 (extreme)
+- Target: Quantify compression ratio and inference speed with each mode

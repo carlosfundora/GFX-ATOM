@@ -1,0 +1,22 @@
+[package]
+name = "rs_turboquant_codec"
+version = "0.1.0"
+edition = "2021"
+description = "TurboQuant KV cache compression codec for gfxATOM"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+schemars = "0.8"
+thiserror = "1.0"
+rand = { version = "0.8", features = ["small_rng"] }
+ndarray = "0.15"
+pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
+numpy = { version = "0.20", optional = true }
+
+[dev-dependencies]
+approx = "0.5"
+
+[features]
+default = []
+python = ["pyo3", "numpy"]

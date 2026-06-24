@@ -1,0 +1,33 @@
+{
+  "name": "gfxATOM-Rust",
+  "sources": {
+    "sglang_1_bit_turbo": {
+      "path": "/home/local/ai/build/wip/sglang-1-bit-turbo",
+      "commit": "a2a48a4d96fc89f4f1cdd142ec1768c6890d7bae"
+    },
+    "vllm_1_bit_turbo": {
+      "path": "/home/local/ai/forks/vllm-1-bit-turbo",
+      "commit": "e3745d92f0c4db450ed52a7ec0fa607463cae19d"
+    },
+    "gfxatom": {
+      "path": "/home/local/ai/engines/gfxatom",
+      "commit": "30fa8e413ed734823df0eea7fcaba89a4d0da9b2"
+    },
+    "gfxgraph": {
+      "path": "/home/local/ai/build/wip/gfxGRAPH",
+      "commit": "a10ef158ecb40ea3b64e057ef985ab239dcbf922"
+    }
+  },
+  "runtime_profile_flags": [
+    "supports_atom_backend",
+    "supports_atom_attention",
+    "supports_atom_kv_quant",
+    "supports_atom_rocm_telemetry",
+    "supports_atom_fallback"
+  ],
+  "notes": {
+    "kv_cache_policy": "atom_fp8 is currently normalized to fp8_e4m3 in sglang server args",
+    "fallback_policy": "atom backend falls back to triton when aiter is unavailable"
+  }
+}
+

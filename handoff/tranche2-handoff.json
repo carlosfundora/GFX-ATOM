@@ -1,0 +1,68 @@
+{
+  "name": "tranche2-handoff-kit",
+  "goal": "handoff from KV/quant unification to backend/runtime integration",
+  "support_matrix": {
+    "baseline_codecs": [
+      "tq4",
+      "tq3",
+      "tq2",
+      "rq3_planar",
+      "rq4_planar",
+      "fp8_e4m3"
+    ],
+    "policy_layers": [
+      "static",
+      "adaptive",
+      "learned",
+      "fallback"
+    ],
+    "autoquant_features": [
+      "fingerprint_digest",
+      "json_shelf",
+      "observer_snapshot",
+      "policy_round_trip"
+    ],
+    "validation_result": "workspace tests pass"
+  },
+  "fallback_tree": [
+    {
+      "request": "atom attention",
+      "fallback": [
+        "aiter",
+        "triton"
+      ]
+    },
+    {
+      "request": "atom_fp8 kv cache",
+      "fallback": [
+        "fp8_e4m3"
+      ]
+    },
+    {
+      "request": "rq3/rq4 aliases",
+      "fallback": [
+        "rq3_planar",
+        "rq4_planar"
+      ]
+    },
+    {
+      "request": "unsupported codec",
+      "fallback": [
+        "tq4 baseline policy"
+      ]
+    }
+  ],
+  "evidence_bundle": [
+    "inventory/kv-dedupe-map.json",
+    "donors/DONORS_INDEX.md",
+    "crates/rs_kv_quant_contracts",
+    "crates/rs_autoquant_policy",
+    "crates/rs_kv_codec_adapters",
+    "crates/rs_kv_validation_harness"
+  ],
+  "next_stage_contracts": [
+    "SGLang backend adapter receives codec registry + policy decision only",
+    "Runtime telemetry remains separate from codec execution",
+    "Codec aliases are normalized before backend dispatch"
+  ]
+}

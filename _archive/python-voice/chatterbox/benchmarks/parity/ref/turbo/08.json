@@ -1,0 +1,16 @@
+{
+  "variant": "turbo",
+  "side": "ref",
+  "ref_impl": "ChatterboxTurboTTS.from_local(cpu)",
+  "index": 8,
+  "text": "After the long meeting, everyone agreed that the proposal needed at least one more round of careful review before launch.",
+  "params": {
+    "defaults": true,
+    "sampling": "stochastic (reference defaults)",
+    "seed": null
+  },
+  "load_s": 6.95,
+  "elapsed_s": 15.076,
+  "sr": 24000,
+  "audio_s": 6.68
+}

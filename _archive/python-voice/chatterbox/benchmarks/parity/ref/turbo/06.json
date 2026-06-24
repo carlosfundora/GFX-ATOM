@@ -1,0 +1,16 @@
+{
+  "variant": "turbo",
+  "side": "ref",
+  "ref_impl": "ChatterboxTurboTTS.from_local(cpu)",
+  "index": 6,
+  "text": "The weather today is bright and clear, with a gentle breeze drifting in from the coast.",
+  "params": {
+    "defaults": true,
+    "sampling": "stochastic (reference defaults)",
+    "seed": null
+  },
+  "load_s": 6.95,
+  "elapsed_s": 8.445,
+  "sr": 24000,
+  "audio_s": 4.6
+}

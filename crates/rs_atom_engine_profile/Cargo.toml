@@ -1,0 +1,12 @@
+[package]
+name = "rs_atom_engine_profile"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "rs_atom_engine_profile"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+

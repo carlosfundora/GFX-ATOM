@@ -1,0 +1,13 @@
+[package]
+name = "rs_kv_codec_adapters"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "rs_kv_codec_adapters"
+path = "src/lib.rs"
+
+[dependencies]
+rs_kv_quant_contracts = { path = "../rs_kv_quant_contracts" }
+serde = { version = "1.0", features = ["derive"] }
+

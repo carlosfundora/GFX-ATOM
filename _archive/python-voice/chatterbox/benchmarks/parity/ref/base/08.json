@@ -1,0 +1,17 @@
+{
+  "variant": "base",
+  "side": "ref",
+  "ref_impl": "ChatterboxMultilingualTTS.from_local(cpu, t3_mtl23ls_v2, language_id=en)",
+  "index": 8,
+  "text": "After the long meeting, everyone agreed that the proposal needed at least one more round of careful review before launch.",
+  "params": {
+    "defaults": true,
+    "sampling": "stochastic (reference defaults)",
+    "seed": null,
+    "language_id": "en"
+  },
+  "load_s": 9.25,
+  "elapsed_s": 24.528,
+  "sr": 24000,
+  "audio_s": 6.4
+}

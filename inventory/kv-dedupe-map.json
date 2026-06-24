@@ -1,0 +1,180 @@
+{
+  "focus": "kv_quant_unification",
+  "canonical_root": "/home/local/ai/projects/gfxATOM-Rust",
+  "concerns": [
+    {
+      "name": "policy_layer",
+      "description": "Adaptive and static KV policy selection, fingerprinting, shelf persistence, observer sampling.",
+      "sources": [
+        {
+          "path": "/home/local/ai/build/wip/sglang-1-bit-turbo/python/sglang/srt/layers/quantization/autoquant",
+          "kind": "wip_sglang_autoquant"
+        },
+        {
+          "path": "/home/local/ai/build/patches/sglang-1-bit-turbo/PATCH-NOTES.md",
+          "kind": "patch_notes"
+        },
+        {
+          "path": "/home/local/ai/build/patches/sglang-1-bit-turbo",
+          "kind": "patch_series"
+        }
+      ],
+      "canonical_owner": "gfxATOM-Rust policy_engine"
+    },
+    {
+      "name": "codec_registry",
+      "description": "Normalized precision/codec naming and alias resolution across RQ/TQ/FP8/INT8 and donor variants.",
+      "sources": [
+        {
+          "path": "/home/local/ai/build/wip/sglang-1-bit-turbo/python/sglang/srt/server_args.py",
+          "kind": "runtime_aliases"
+        },
+        {
+          "path": "/home/local/ai/build/kernels/tq3_0-kv-cache",
+          "kind": "activation_aware_quant"
+        },
+        {
+          "path": "/home/local/ai/build/kernels/llama-cpp-tq3-kvcache",
+          "kind": "activation_aware_quant"
+        },
+        {
+          "path": "/home/local/ai/build/kernels/sglang-prism-q1",
+          "kind": "prism_1bit"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/turbo-quant",
+          "kind": "quant_donor"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/QAQ-KVCacheQuantization",
+          "kind": "quant_donor"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/RateQuant",
+          "kind": "quant_donor"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/delta-k-quantization",
+          "kind": "quant_donor"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/NautilusQuant",
+          "kind": "quant_donor"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/norm-separated-quantization",
+          "kind": "quant_donor"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/Higman-sims-quant",
+          "kind": "quant_donor"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/wobble-quant-cache",
+          "kind": "quant_donor"
+        }
+      ],
+      "canonical_owner": "gfxATOM-Rust codec_registry"
+    },
+    {
+      "name": "runtime_baselines",
+      "description": "Serving/runtime and benchmark baselines used for compatibility and perf comparisons.",
+      "sources": [
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/vllm",
+          "kind": "serving_baseline"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/vllm-omni",
+          "kind": "serving_baseline"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/vllm-ascend",
+          "kind": "serving_baseline"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/vllm_backend",
+          "kind": "serving_baseline"
+        },
+        {
+          "path": "/home/local/ai/projects/.archived/repos/llm-compressor",
+          "kind": "quant_tooling"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/vLLMTurboQuantKVCacheCPU",
+          "kind": "benchmark_baseline"
+        },
+        {
+          "path": "/home/local/ai/projects/.archived/repos/quant.cpp",
+          "kind": "runtime_baseline"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/rust-llama.cpp",
+          "kind": "ffi_baseline"
+        },
+        {
+          "path": "/home/local/ai/projects/.archived/repos/rvllm",
+          "kind": "runtime_baseline"
+        }
+      ],
+      "canonical_owner": "gfxATOM-Rust integration harness"
+    },
+    {
+      "name": "kv_memory_systems",
+      "description": "Cache managers, multi-level memory systems, and compression-aware scheduling patterns.",
+      "sources": [
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/KVCache-Factory",
+          "kind": "policy_family"
+        },
+        {
+          "path": "/home/local/ai/projects/.archived/repos/R-KV",
+          "kind": "compression_cluster"
+        },
+        {
+          "path": "/home/local/ai/projects/.archived/repos/tair-kvcache",
+          "kind": "distributed_cache"
+        },
+        {
+          "path": "/home/local/ai/projects/.archived/repos/sardeenz",
+          "kind": "multi_model_packing"
+        },
+        {
+          "path": "/home/local/ai/projects/.archived/repos/llama-swap",
+          "kind": "routing_gateway"
+        },
+        {
+          "path": "/home/local/ai/projects/gfxATOM-Rust/donors/smg",
+          "kind": "routing_gateway"
+        }
+      ],
+      "canonical_owner": "gfxATOM-Rust policy_engine"
+    },
+    {
+      "name": "custom_build_assets",
+      "description": "Local kernels, patches, and wheels capturing project-specific optimization work.",
+      "sources": [
+        {
+          "path": "/home/local/ai/build/kernels",
+          "kind": "kernel_source"
+        },
+        {
+          "path": "/home/local/ai/build/patches",
+          "kind": "patch_series"
+        },
+        {
+          "path": "/home/local/ai/build/wheels",
+          "kind": "custom_wheels"
+        }
+      ],
+      "canonical_owner": "gfxATOM-Rust evidence_inputs"
+    }
+  ],
+  "dedupe_rules": [
+    "Prefer Rust-first implementation when a concern has both Python and Rust examples.",
+    "Treat donor README claims as hypotheses until benchmarked.",
+    "Merge codec aliases into a single normalized registry before implementing adapters.",
+    "Keep policy selection separate from codec execution and runtime wiring.",
+    "Deduplicate at the concern level before deduplicating individual code paths."
+  ]
+}

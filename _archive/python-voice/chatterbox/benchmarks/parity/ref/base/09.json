@@ -1,0 +1,17 @@
+{
+  "variant": "base",
+  "side": "ref",
+  "ref_impl": "ChatterboxMultilingualTTS.from_local(cpu, t3_mtl23ls_v2, language_id=en)",
+  "index": 9,
+  "text": "Reading aloud improves pronunciation, pacing, and confidence.",
+  "params": {
+    "defaults": true,
+    "sampling": "stochastic (reference defaults)",
+    "seed": null,
+    "language_id": "en"
+  },
+  "load_s": 9.25,
+  "elapsed_s": 17.639,
+  "sr": 24000,
+  "audio_s": 4.12
+}

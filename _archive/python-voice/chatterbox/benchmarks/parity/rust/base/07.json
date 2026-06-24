@@ -1,0 +1,18 @@
+{
+  "variant": "base",
+  "side": "rust",
+  "index": 7,
+  "text": "Stop right there!",
+  "params": {
+    "decode": "greedy",
+    "seed": null
+  },
+  "cmd": "/home/local/ai/projects/rust/target/release/chatterbox_cli synthesize --manifest /home/local/ai/models/chatterbox-rs/base/manifest.json --text Stop right there! --voice default --voice-wav /home/local/ai/models/chatterbox-rs/base/default_voice.wav --out /home/local/ai/build/wip/chatterbox/benchmarks/parity/rust/base/07.wav --greedy --voice-cache /home/local/ai/build/wip/chatterbox/benchmarks/parity/voice_cache/base",
+  "wall_s": 70.382,
+  "engine_load_ms": 63366,
+  "first_token_ms": 222,
+  "generate_ms": 6606,
+  "audio_s": 0.64,
+  "sr": 24000,
+  "stderr_tail": "wrote /home/local/ai/build/wip/chatterbox/benchmarks/parity/rust/base/07.wav (0.64s @ 24000 Hz) | first_token=222ms generate=6606ms"
+}

@@ -1,0 +1,16 @@
+{
+  "variant": "turbo",
+  "side": "ref",
+  "ref_impl": "ChatterboxTurboTTS.from_local(cpu)",
+  "index": 7,
+  "text": "Stop right there!",
+  "params": {
+    "defaults": true,
+    "sampling": "stochastic (reference defaults)",
+    "seed": null
+  },
+  "load_s": 6.95,
+  "elapsed_s": 5.616,
+  "sr": 24000,
+  "audio_s": 1.16
+}

@@ -1,0 +1,17 @@
+[package]
+name = "rs_gguf_loader_core"
+version = "0.1.0"
+edition = "2021"
+description = "Rust-first GGUF header and load-plan core for ATOM backend assimilation"
+license = "MIT"
+publish = false
+
+[lib]
+name = "rs_gguf_loader_core"
+path = "src/lib.rs"
+
+[dependencies]
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2.0"

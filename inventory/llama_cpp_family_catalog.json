@@ -1,0 +1,1438 @@
+{
+  "source_root": "/home/local/ai/projects/donors/llama.cpp-1-bit-turbo",
+  "source_revision": "262d3534037dc597fe0f9f41b0ced7f654e21d5b",
+  "source_files": [
+    "src/llama-arch.cpp",
+    "src/llama-graph.cpp",
+    "src/llama-model-loader.cpp",
+    "src/llama-model.cpp"
+  ],
+  "attention_feature_markers": [
+    "moe",
+    "pooling_type",
+    "softcapping",
+    "vision"
+  ],
+  "families": [
+    {
+      "family_id": "afmoe",
+      "architectures": [
+        "afmoe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "apertus",
+      "architectures": [
+        "apertus"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "arcee",
+      "architectures": [
+        "arcee"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "arctic",
+      "architectures": [
+        "arctic"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "arwkv7",
+      "architectures": [
+        "arwkv7"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "baichuan",
+      "architectures": [
+        "baichuan"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "bailingmoe",
+      "architectures": [
+        "bailingmoe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "bailingmoe2",
+      "architectures": [
+        "bailingmoe2"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "bert",
+      "architectures": [
+        "bert"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "bitnet",
+      "architectures": [
+        "bitnet"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "bloom",
+      "architectures": [
+        "bloom"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "chameleon",
+      "architectures": [
+        "chameleon"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "chatglm",
+      "architectures": [
+        "chatglm"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "clip",
+      "architectures": [
+        "clip"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "codeshell",
+      "architectures": [
+        "codeshell"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "cogvlm",
+      "architectures": [
+        "cogvlm"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "multimodal",
+        "pooling"
+      ],
+      "model_roles": [
+        "multimodal"
+      ]
+    },
+    {
+      "family_id": "cohere2",
+      "architectures": [
+        "cohere2"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "command_r",
+      "architectures": [
+        "command-r"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "dbrx",
+      "architectures": [
+        "dbrx"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "deci",
+      "architectures": [
+        "deci"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "deepseek",
+      "architectures": [
+        "deepseek",
+        "deepseek2",
+        "deepseek2-ocr"
+      ],
+      "attention_traits": [
+        "special_attention_indexer",
+        "yarn_rope"
+      ],
+      "graph_traits": [
+        "ocr_or_document",
+        "pooling"
+      ],
+      "model_roles": [
+        "multimodal"
+      ]
+    },
+    {
+      "family_id": "dots1",
+      "architectures": [
+        "dots1"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "dream",
+      "architectures": [
+        "dream"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "eagle3",
+      "architectures": [
+        "eagle3"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "ernie4_5",
+      "architectures": [
+        "ernie4_5"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "ernie4_5_moe",
+      "architectures": [
+        "ernie4_5-moe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "eurobert",
+      "architectures": [
+        "eurobert"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "exaone",
+      "architectures": [
+        "exaone"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "exaone4",
+      "architectures": [
+        "exaone4"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "exaone_moe",
+      "architectures": [
+        "exaone-moe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "falcon",
+      "architectures": [
+        "falcon"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "falcon_h1",
+      "architectures": [
+        "falcon-h1"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "gemma",
+      "architectures": [
+        "gemma",
+        "gemma-embedding",
+        "gemma2",
+        "gemma3",
+        "gemma3n",
+        "gemma4"
+      ],
+      "attention_traits": [
+        "embedding_pooling",
+        "vision_aware"
+      ],
+      "graph_traits": [
+        "embedding",
+        "multimodal",
+        "pooling"
+      ],
+      "model_roles": [
+        "embedding"
+      ]
+    },
+    {
+      "family_id": "glm4",
+      "architectures": [
+        "glm4"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "glm4moe",
+      "architectures": [
+        "glm4moe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "glm_dsa",
+      "architectures": [
+        "glm-dsa"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "gpt2",
+      "architectures": [
+        "gpt2"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "gptj",
+      "architectures": [
+        "gptj"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "gptneox",
+      "architectures": [
+        "gptneox"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "granite",
+      "architectures": [
+        "granite"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "granitehybrid",
+      "architectures": [
+        "granitehybrid"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "granitemoe",
+      "architectures": [
+        "granitemoe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "grok",
+      "architectures": [
+        "grok"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "grovemoe",
+      "architectures": [
+        "grovemoe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "hunyuan_dense",
+      "architectures": [
+        "hunyuan-dense"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "hunyuan_moe",
+      "architectures": [
+        "hunyuan-moe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "internlm2",
+      "architectures": [
+        "internlm2"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "jais",
+      "architectures": [
+        "jais"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "jais2",
+      "architectures": [
+        "jais2"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "jamba",
+      "architectures": [
+        "jamba"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "jina_bert_v2",
+      "architectures": [
+        "jina-bert-v2"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "jina_bert_v3",
+      "architectures": [
+        "jina-bert-v3"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "kimi_linear",
+      "architectures": [
+        "kimi-linear"
+      ],
+      "attention_traits": [
+        "linear_attention",
+        "long_context"
+      ],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "lfm2",
+      "architectures": [
+        "lfm2",
+        "lfm2moe"
+      ],
+      "attention_traits": [
+        "hybrid_context",
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "reasoning"
+      ]
+    },
+    {
+      "family_id": "llada",
+      "architectures": [
+        "llada"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "llada_moe",
+      "architectures": [
+        "llada-moe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "llama",
+      "architectures": [
+        "llama",
+        "llama-embed",
+        "llama4"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "chat"
+      ]
+    },
+    {
+      "family_id": "maincoder",
+      "architectures": [
+        "maincoder"
+      ],
+      "attention_traits": [
+        "code_generation"
+      ],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "code"
+      ]
+    },
+    {
+      "family_id": "mamba",
+      "architectures": [
+        "mamba",
+        "mamba2"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "mimo2",
+      "architectures": [
+        "mimo2"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "minicpm",
+      "architectures": [
+        "minicpm"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "minicpm3",
+      "architectures": [
+        "minicpm3"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "minimax_m2",
+      "architectures": [
+        "minimax-m2"
+      ],
+      "attention_traits": [
+        "reasoning"
+      ],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "reasoning"
+      ]
+    },
+    {
+      "family_id": "mistral",
+      "architectures": [
+        "mistral3",
+        "mistral4"
+      ],
+      "attention_traits": [
+        "sliding_window",
+        "softcapping"
+      ],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "chat"
+      ]
+    },
+    {
+      "family_id": "modern_bert",
+      "architectures": [
+        "modern-bert"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "mpt",
+      "architectures": [
+        "mpt"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "nemotron",
+      "architectures": [
+        "nemotron"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "nemotron_h",
+      "architectures": [
+        "nemotron_h"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "nemotron_h_moe",
+      "architectures": [
+        "nemotron_h_moe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "neo_bert",
+      "architectures": [
+        "neo-bert"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "nomic_bert",
+      "architectures": [
+        "nomic-bert"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "nomic_bert_moe",
+      "architectures": [
+        "nomic-bert-moe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "olmo",
+      "architectures": [
+        "olmo"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "olmo2",
+      "architectures": [
+        "olmo2"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "olmoe",
+      "architectures": [
+        "olmoe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "openai_moe",
+      "architectures": [
+        "gpt-oss"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "openelm",
+      "architectures": [
+        "openelm"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "orion",
+      "architectures": [
+        "orion"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "paddleocr",
+      "architectures": [
+        "paddleocr"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "ocr_or_document",
+        "pooling"
+      ],
+      "model_roles": [
+        "multimodal"
+      ]
+    },
+    {
+      "family_id": "pangu_embedded",
+      "architectures": [
+        "pangu-embedded"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "phi",
+      "architectures": [
+        "phi2",
+        "phi3",
+        "phimoe"
+      ],
+      "attention_traits": [
+        "moe_routing"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "plamo",
+      "architectures": [
+        "plamo"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "plamo2",
+      "architectures": [
+        "plamo2"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "plamo3",
+      "architectures": [
+        "plamo3"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "plm",
+      "architectures": [
+        "plm"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "qwen",
+      "architectures": [
+        "qwen",
+        "qwen2",
+        "qwen2moe",
+        "qwen2vl",
+        "qwen3",
+        "qwen35",
+        "qwen35moe",
+        "qwen3moe",
+        "qwen3next",
+        "qwen3vl",
+        "qwen3vlmoe"
+      ],
+      "attention_traits": [
+        "last_token_pooling",
+        "moe_routing",
+        "shared_kv_layers",
+        "sliding_window"
+      ],
+      "graph_traits": [
+        "mixture_of_experts",
+        "multimodal",
+        "pooling"
+      ],
+      "model_roles": [
+        "chat",
+        "multimodal"
+      ]
+    },
+    {
+      "family_id": "refact",
+      "architectures": [
+        "refact"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "rnd1",
+      "architectures": [
+        "rnd1"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "rwkv",
+      "architectures": [
+        "rwkv6",
+        "rwkv6qwen2",
+        "rwkv7"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "seed_oss",
+      "architectures": [
+        "seed_oss"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "smallthinker",
+      "architectures": [
+        "smallthinker"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "smollm3",
+      "architectures": [
+        "smollm3"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "stablelm",
+      "architectures": [
+        "stablelm"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "starcoder",
+      "architectures": [
+        "starcoder"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "starcoder2",
+      "architectures": [
+        "starcoder2"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "step35",
+      "architectures": [
+        "step35"
+      ],
+      "attention_traits": [
+        "special_cache_path",
+        "stepwise_graph"
+      ],
+      "graph_traits": [
+        "pooling",
+        "special_graph_branch"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "t5",
+      "architectures": [
+        "t5"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "t5encoder",
+      "architectures": [
+        "t5encoder"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "unknown",
+      "architectures": [
+        "(unknown)"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "wavtokenizer_dec",
+      "architectures": [
+        "wavtokenizer-dec"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    },
+    {
+      "family_id": "xverse",
+      "architectures": [
+        "xverse"
+      ],
+      "attention_traits": [],
+      "graph_traits": [
+        "pooling"
+      ],
+      "model_roles": [
+        "general"
+      ]
+    }
+  ]
+}

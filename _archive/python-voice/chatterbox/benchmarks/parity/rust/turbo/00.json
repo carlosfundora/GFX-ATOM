@@ -1,0 +1,18 @@
+{
+  "variant": "turbo",
+  "side": "rust",
+  "index": 0,
+  "text": "Hello there.",
+  "params": {
+    "decode": "greedy",
+    "seed": null
+  },
+  "cmd": "/home/local/ai/projects/rust/target/release/chatterbox_cli synthesize --manifest /home/local/ai/models/chatterbox-rs/turbo/manifest.json --text Hello there. --voice default --voice-wav /home/local/ai/models/chatterbox-rs/base/default_voice.wav --out /home/local/ai/build/wip/chatterbox/benchmarks/parity/rust/turbo/00.wav --greedy --voice-cache /home/local/ai/build/wip/chatterbox/benchmarks/parity/voice_cache/turbo",
+  "wall_s": 12.416,
+  "engine_load_ms": 9780,
+  "first_token_ms": 246,
+  "generate_ms": 1916,
+  "audio_s": 0.92,
+  "sr": 24000,
+  "stderr_tail": "wrote /home/local/ai/build/wip/chatterbox/benchmarks/parity/rust/turbo/00.wav (0.92s @ 24000 Hz) | first_token=246ms generate=1916ms"
+}

@@ -1,0 +1,16 @@
+{
+  "variant": "turbo",
+  "side": "ref",
+  "ref_impl": "ChatterboxTurboTTS.from_local(cpu)",
+  "index": 9,
+  "text": "Reading aloud improves pronunciation, pacing, and confidence.",
+  "params": {
+    "defaults": true,
+    "sampling": "stochastic (reference defaults)",
+    "seed": null
+  },
+  "load_s": 6.95,
+  "elapsed_s": 9.082,
+  "sr": 24000,
+  "audio_s": 3.52
+}

@@ -1,0 +1,622 @@
+{
+  "timestamp": "2026-05-17 05:35:08",
+  "summary": {
+    "total": 36,
+    "passed": 36,
+    "failed": 0
+  },
+  "results": [
+    {
+      "test_name": "roundtrip_tq1_(1, 128, 32, 128)",
+      "mode": "tq1",
+      "shape": [
+        1,
+        128,
+        32,
+        128
+      ],
+      "original_bytes": 2097152,
+      "compressed_bytes": 1048576,
+      "encode_ms": 2.3397250042762607,
+      "decode_ms": 8.616020990302786,
+      "roundtrip_mse": 4.326436453538918e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "roundtrip_tq1_(4, 256, 32, 128)",
+      "mode": "tq1",
+      "shape": [
+        4,
+        256,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 15.328306006267667,
+      "decode_ms": 7.79533400782384,
+      "roundtrip_mse": 4.309721646222897e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "roundtrip_tq1_(1, 1024, 32, 128)",
+      "mode": "tq1",
+      "shape": [
+        1,
+        1024,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 15.916019008727744,
+      "decode_ms": 8.00266899750568,
+      "roundtrip_mse": 4.3161328733276605e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "roundtrip_tq2_(1, 128, 32, 128)",
+      "mode": "tq2",
+      "shape": [
+        1,
+        128,
+        32,
+        128
+      ],
+      "original_bytes": 2097152,
+      "compressed_bytes": 1048576,
+      "encode_ms": 1.3838009908795357,
+      "decode_ms": 1.6564250108785927,
+      "roundtrip_mse": 4.306638601292434e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "roundtrip_tq2_(4, 256, 32, 128)",
+      "mode": "tq2",
+      "shape": [
+        4,
+        256,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 15.959159005433321,
+      "decode_ms": 8.231813000747934,
+      "roundtrip_mse": 4.3163012719560356e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "roundtrip_tq2_(1, 1024, 32, 128)",
+      "mode": "tq2",
+      "shape": [
+        1,
+        1024,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 16.257490002317354,
+      "decode_ms": 8.608361997175962,
+      "roundtrip_mse": 4.312435208930765e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "roundtrip_tq3_(1, 128, 32, 128)",
+      "mode": "tq3",
+      "shape": [
+        1,
+        128,
+        32,
+        128
+      ],
+      "original_bytes": 2097152,
+      "compressed_bytes": 1048576,
+      "encode_ms": 1.3661419798154384,
+      "decode_ms": 1.6228649765253067,
+      "roundtrip_mse": 4.3270652838600654e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "roundtrip_tq3_(4, 256, 32, 128)",
+      "mode": "tq3",
+      "shape": [
+        4,
+        256,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 15.956707997247577,
+      "decode_ms": 8.110995986498892,
+      "roundtrip_mse": 4.312301626896442e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "roundtrip_tq3_(1, 1024, 32, 128)",
+      "mode": "tq3",
+      "shape": [
+        1,
+        1024,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 15.735294000478461,
+      "decode_ms": 7.9267609980888665,
+      "roundtrip_mse": 4.3180222064620466e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "roundtrip_tq4_(1, 128, 32, 128)",
+      "mode": "tq4",
+      "shape": [
+        1,
+        128,
+        32,
+        128
+      ],
+      "original_bytes": 2097152,
+      "compressed_bytes": 1048576,
+      "encode_ms": 1.3653119967784733,
+      "decode_ms": 1.6416450089309365,
+      "roundtrip_mse": 4.320020252635004e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "roundtrip_tq4_(4, 256, 32, 128)",
+      "mode": "tq4",
+      "shape": [
+        4,
+        256,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 15.814843005500734,
+      "decode_ms": 7.976958993822336,
+      "roundtrip_mse": 4.3131350935254886e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "roundtrip_tq4_(1, 1024, 32, 128)",
+      "mode": "tq4",
+      "shape": [
+        1,
+        1024,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 15.838071994949132,
+      "decode_ms": 8.02090801880695,
+      "roundtrip_mse": 4.309692513970731e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "inner_product_tq1_(1, 128, 32, 128)",
+      "mode": "tq1",
+      "shape": [
+        1,
+        128,
+        32,
+        128
+      ],
+      "original_bytes": 2097152,
+      "compressed_bytes": 131072,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 0.0,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "inner_product_tq1_(4, 256, 32, 128)",
+      "mode": "tq1",
+      "shape": [
+        4,
+        256,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 1048576,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 0.0,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "inner_product_tq1_(1, 1024, 32, 128)",
+      "mode": "tq1",
+      "shape": [
+        1,
+        1024,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 1048576,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 0.0,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "inner_product_tq2_(1, 128, 32, 128)",
+      "mode": "tq2",
+      "shape": [
+        1,
+        128,
+        32,
+        128
+      ],
+      "original_bytes": 2097152,
+      "compressed_bytes": 262144,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 0.0,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "inner_product_tq2_(4, 256, 32, 128)",
+      "mode": "tq2",
+      "shape": [
+        4,
+        256,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 2097152,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 0.0,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "inner_product_tq2_(1, 1024, 32, 128)",
+      "mode": "tq2",
+      "shape": [
+        1,
+        1024,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 2097152,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 0.0,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "inner_product_tq3_(1, 128, 32, 128)",
+      "mode": "tq3",
+      "shape": [
+        1,
+        128,
+        32,
+        128
+      ],
+      "original_bytes": 2097152,
+      "compressed_bytes": 393461,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 0.0,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "inner_product_tq3_(4, 256, 32, 128)",
+      "mode": "tq3",
+      "shape": [
+        4,
+        256,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 3147695,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 0.0,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "inner_product_tq3_(1, 1024, 32, 128)",
+      "mode": "tq3",
+      "shape": [
+        1,
+        1024,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 3147695,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 0.0,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "inner_product_tq4_(1, 128, 32, 128)",
+      "mode": "tq4",
+      "shape": [
+        1,
+        128,
+        32,
+        128
+      ],
+      "original_bytes": 2097152,
+      "compressed_bytes": 524288,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 0.0,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "inner_product_tq4_(4, 256, 32, 128)",
+      "mode": "tq4",
+      "shape": [
+        4,
+        256,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 4194304,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 0.0,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "inner_product_tq4_(1, 1024, 32, 128)",
+      "mode": "tq4",
+      "shape": [
+        1,
+        1024,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 4194304,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 0.0,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "batch_tq1_0",
+      "mode": "tq1",
+      "shape": [
+        1,
+        128,
+        32,
+        128
+      ],
+      "original_bytes": 2097152,
+      "compressed_bytes": 1048576,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 4.3337998079095996e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "batch_tq1_1",
+      "mode": "tq1",
+      "shape": [
+        4,
+        256,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 4.3081890055418626e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "batch_tq1_2",
+      "mode": "tq1",
+      "shape": [
+        2,
+        512,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 4.3178896902418273e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "batch_tq2_0",
+      "mode": "tq2",
+      "shape": [
+        1,
+        128,
+        32,
+        128
+      ],
+      "original_bytes": 2097152,
+      "compressed_bytes": 1048576,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 4.308709833367175e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "batch_tq2_1",
+      "mode": "tq2",
+      "shape": [
+        4,
+        256,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 4.306425793743074e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "batch_tq2_2",
+      "mode": "tq2",
+      "shape": [
+        2,
+        512,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 4.315524293474482e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "batch_tq3_0",
+      "mode": "tq3",
+      "shape": [
+        1,
+        128,
+        32,
+        128
+      ],
+      "original_bytes": 2097152,
+      "compressed_bytes": 1048576,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 4.320358115705858e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "batch_tq3_1",
+      "mode": "tq3",
+      "shape": [
+        4,
+        256,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 4.309807977165292e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "batch_tq3_2",
+      "mode": "tq3",
+      "shape": [
+        2,
+        512,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 4.3149920969653976e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "batch_tq4_0",
+      "mode": "tq4",
+      "shape": [
+        1,
+        128,
+        32,
+        128
+      ],
+      "original_bytes": 2097152,
+      "compressed_bytes": 1048576,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 4.335966963253668e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "batch_tq4_1",
+      "mode": "tq4",
+      "shape": [
+        4,
+        256,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 4.312536105999243e-08,
+      "passed": true,
+      "error_msg": ""
+    },
+    {
+      "test_name": "batch_tq4_2",
+      "mode": "tq4",
+      "shape": [
+        2,
+        512,
+        32,
+        128
+      ],
+      "original_bytes": 16777216,
+      "compressed_bytes": 8388608,
+      "encode_ms": 0,
+      "decode_ms": 0,
+      "roundtrip_mse": 4.318435387062891e-08,
+      "passed": true,
+      "error_msg": ""
+    }
+  ]
+}

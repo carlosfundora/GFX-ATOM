@@ -34,6 +34,7 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, WebSocket
 from fastapi.responses import JSONResponse, StreamingResponse
 from transformers import AutoTokenizer
 
+from .chat_encoders import apply_chat_template, load_custom_message_encoder
 from .protocol import (
     ChatCompletionRequest,
     CompletionRequest,
@@ -94,6 +95,7 @@ embedding_pooling: str = "last"
 embedding_default_dimensions: Optional[int] = None
 embedding_allowed_dimensions: set[int] = set()
 default_chat_template_kwargs: Dict[str, Any] = {}
+custom_message_encoder: Optional[Any] = None
 _stream_queues: Dict[str, asyncio.Queue] = {}
 _seq_id_to_request_id: Dict[int, str] = {}
 _stream_loops: Dict[str, AbstractEventLoop] = {}
@@ -654,14 +656,12 @@ async def chat_completions(request: ChatCompletionRequest):
         merged_kwargs = dict(default_chat_template_kwargs)
         if request.chat_template_kwargs:
             merged_kwargs.update(request.chat_template_kwargs)
-        merged_kwargs["tokenize"] = False
-        merged_kwargs["add_generation_prompt"] = True
-        # Pass tools so the chat template can inject tool declarations
-        if request.tools:
-            merged_kwargs["tools"] = request.tools
 
-        prompt = tokenizer.apply_chat_template(
+        prompt = apply_chat_template(
+            tokenizer,
+            custom_message_encoder,
             [msg.to_template_dict() for msg in messages],
+            tools=request.tools,
             **merged_kwargs,
         )
 
@@ -1127,6 +1127,7 @@ def main():
     global default_chat_template_kwargs, _request_logger
     global embedding_mode, embedding_pooling, embedding_default_dimensions
     global embedding_allowed_dimensions
+    global custom_message_encoder
 
     parser = argparse.ArgumentParser(description="ATOM OpenAI API Server")
     EngineArgs.add_cli_args(parser)
@@ -1357,6 +1358,7 @@ def main():
         logger.info(f"Loading tokenizer from {args.model}...")
         tokenizer = _load_tokenizer(args.model, args.trust_remote_code)
         model_name = args.model
+        custom_message_encoder = load_custom_message_encoder(args.model)
         allowed_model_names = {model_name, *args.model_alias}
 
         logger.info(f"Initializing engine with model {args.model}...")
