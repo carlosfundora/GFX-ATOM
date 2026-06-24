@@ -126,3 +126,16 @@ KVConnectorFactory.register(
     scheduler_module="atom.kv_transfer.disaggregation.kv_transfer_engine",
     scheduler_class="KVConnectorScheduler",
 )
+
+# Register Universal KV Broker backend (optional, requires sglang + universal_kv)
+try:
+    KVConnectorFactory.register(
+        "universal_broker",
+        worker_module="atom.kv_transfer.universal_broker_adapter",
+        worker_class="UniversalBrokerConnector",
+        scheduler_module="atom.kv_transfer.universal_broker_adapter",
+        scheduler_class="UniversalBrokerSchedulerConnector",
+    )
+    logger.debug("Universal KV Broker backend registered successfully")
+except Exception as e:
+    logger.debug(f"Could not register Universal KV Broker backend: {e}")

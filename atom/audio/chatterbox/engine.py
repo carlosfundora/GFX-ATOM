@@ -11,6 +11,7 @@ by adding inputs_embeds support to the request pipeline.
 """
 
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Optional
@@ -18,6 +19,25 @@ from typing import Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
+
+try:
+    import rs_codec
+
+    _HAS_RS_CODEC = True
+except ImportError:
+    _HAS_RS_CODEC = False
+
+# Native Rust synthesis (rs_chatterbox_runtime PyO3, ATOM-RS ort engine).
+# Opt-in via CHATTERBOX_RUST_ENGINE=1; any failure falls back to the Python
+# pipeline below, keeping the serving surface unchanged.
+_RUST_RUNTIME = None
+if os.getenv("CHATTERBOX_RUST_ENGINE", "0") == "1":
+    try:
+        import rs_chatterbox_runtime as _rs_chatterbox_runtime
+
+        _RUST_RUNTIME = _rs_chatterbox_runtime
+    except ImportError:
+        _RUST_RUNTIME = None
 
 from atom.audio.chatterbox.onnx_artifacts import resolve_component_path
 from atom.audio.chatterbox.service import (
@@ -109,7 +129,11 @@ class ChatterboxEngine:
         arch = config.architectures[0] if config.architectures else "Unknown"
         logger.info(
             "Loading Chatterbox %s backbone (%s) from %s on %s (%s)",
-            self.variant, arch, self.backbone_dir, self.device, self.dtype,
+            self.variant,
+            arch,
+            self.backbone_dir,
+            self.device,
+            self.dtype,
         )
 
         model = AutoModelForCausalLM.from_pretrained(
@@ -124,7 +148,8 @@ class ChatterboxEngine:
         params_m = sum(p.numel() for p in model.parameters()) / 1e6
         logger.info(
             "Backbone loaded: %.0fM params, %.1fs, VRAM=%.0fMB",
-            params_m, elapsed,
+            params_m,
+            elapsed,
             torch.cuda.memory_allocated(self.device) / 1e6,
         )
 
@@ -142,6 +167,64 @@ class ChatterboxEngine:
             num_threads=self.service.num_threads,
         )
         self._use_gpu_backbone = False
+
+    def _try_rust_generate(
+        self,
+        text: str,
+        ref_audio_path: Optional[str],
+        exaggeration: float,
+        repetition_penalty: float,
+        temperature: float,
+    ) -> Optional[tuple[np.ndarray, dict]]:
+        """Native Rust synthesis via rs_chatterbox_runtime (opt-in).
+
+        Returns None when the Rust path is disabled or fails, so the Python
+        pipeline keeps full control of the serving contract.
+        """
+        if _RUST_RUNTIME is None:
+            return None
+        try:
+            runtime = getattr(self, "_rust_runtime_instance", None)
+            if runtime is None:
+                manifest = os.getenv(
+                    "CHATTERBOX_RUNTIME_MANIFEST",
+                    "/home/local/ai/projects/DEMERZEL/config/chatterbox-runtime.json",
+                )
+                runtime = _RUST_RUNTIME.ChatterboxRuntime(manifest)
+                self._rust_runtime_instance = runtime
+
+            # Variant routing mirrors RuntimeRequest::new: "en" -> turbo.
+            language = "en" if self.variant == "turbo" else "multilingual"
+            request = _RUST_RUNTIME.build_runtime_request(
+                text,
+                "default",
+                language,
+                ref_audio_path,
+                exaggeration,
+                0.5,
+                temperature,
+                repetition_penalty,
+            )
+            t0 = time.time()
+            response = runtime.synthesize(request)
+            pcm = np.frombuffer(response.audio_pcm16, dtype=np.int16)
+            wav = pcm.astype(np.float32) / 32768.0
+            metrics = {
+                "engine": "rust-ort",
+                "sample_rate": response.sample_rate,
+                "first_token_ms": response.first_token_ms,
+                "generate_ms": response.generate_ms,
+                "total_s": time.time() - t0,
+            }
+            logger.info(
+                "Chatterbox rust-ort synthesis: %.2fs audio (gen %.0fms)",
+                len(wav) / float(response.sample_rate),
+                response.generate_ms,
+            )
+            return wav, metrics
+        except Exception as exc:  # noqa: BLE001 — any failure falls back
+            logger.warning("Rust chatterbox path failed (%s); using Python pipeline", exc)
+            return None
 
     @torch.inference_mode()
     def generate(
@@ -164,6 +247,16 @@ class ChatterboxEngine:
             torch.manual_seed(seed)
             np.random.seed(seed)
 
+        rust_result = self._try_rust_generate(
+            text=text,
+            ref_audio_path=ref_audio_path,
+            exaggeration=exaggeration,
+            repetition_penalty=repetition_penalty,
+            temperature=temperature,
+        )
+        if rust_result is not None:
+            return rust_result
+
         metrics = {}
 
         # 1. Encode reference voice (CPU)
@@ -183,36 +276,51 @@ class ChatterboxEngine:
         t2 = time.time()
         if self._use_gpu_backbone:
             speech_tokens = self._generate_gpu(
-                prep, max_tokens, repetition_penalty, temperature,
+                prep,
+                max_tokens,
+                repetition_penalty,
+                temperature,
             )
         else:
             speech_tokens = self._generate_onnx_cpu(
-                prep, ref_data, max_tokens, repetition_penalty, exaggeration,
+                prep,
+                ref_data,
+                max_tokens,
+                repetition_penalty,
+                exaggeration,
             )
         metrics["generate_sec"] = time.time() - t2
         metrics["num_tokens"] = speech_tokens.shape[1]
-        metrics["tok_per_sec"] = metrics["num_tokens"] / max(metrics["generate_sec"], 0.001)
+        metrics["tok_per_sec"] = metrics["num_tokens"] / max(
+            metrics["generate_sec"], 0.001
+        )
 
         # 4. Decode to audio (CPU)
         t3 = time.time()
         wav = self.service.decode_speech(speech_tokens, ref_data)
         metrics["decode_sec"] = time.time() - t3
-        
+
         # 5. Apply AGC and Soft Compression (CPU via Rust)
         t4 = time.time()
-        try:
-            import rs_codec
+        if _HAS_RS_CODEC:
             # target_rms=-18dBFS ~ 0.125.
             # Apply soft compression first to tame peaks
             wav, _ = rs_codec.soft_compressor(wav, 0.5, 4.0, 0.01, 0.1, 1.0)
             # Apply AGC to level out everything to -18dBFS
             wav, _ = rs_codec.agc_kernel(wav, 0.125, 0.01, 0.1, 10.0, 2400, 1.0)
-        except ImportError:
-            pass # Fallback if rs_codec not installed
         metrics["postprocess_sec"] = time.time() - t4
 
         metrics["audio_duration"] = len(wav) / SAMPLE_RATE
-        metrics["total_sec"] = sum(metrics[k] for k in ["encode_sec", "prepare_sec", "generate_sec", "decode_sec", "postprocess_sec"])
+        metrics["total_sec"] = sum(
+            metrics[k]
+            for k in [
+                "encode_sec",
+                "prepare_sec",
+                "generate_sec",
+                "decode_sec",
+                "postprocess_sec",
+            ]
+        )
         metrics["rtf"] = metrics["total_sec"] / max(metrics["audio_duration"], 0.001)
 
         return wav, metrics
@@ -237,6 +345,8 @@ class ChatterboxEngine:
         past_key_values = None
 
         next_token = None
+        # Hoist embedder resolution outside the loop
+        embedder = self._model.get_input_embeddings()
         for i in range(max_tokens):
             if i == 0:
                 outputs = self._model(
@@ -246,7 +356,7 @@ class ChatterboxEngine:
                 )
             else:
                 # Embed single token
-                token_embeds = self._model.get_input_embeddings()(next_token)
+                token_embeds = embedder(next_token)
                 outputs = self._model(
                     inputs_embeds=token_embeds,
                     past_key_values=past_key_values,
@@ -267,11 +377,11 @@ class ChatterboxEngine:
                 # Apply top-k filtering
                 top_k = 50
                 v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
-                logits[logits < v[:, [-1]]] = -float('Inf')
-                
+                logits[logits < v[:, [-1]]] = -float("Inf")
+
                 probs = F.softmax(logits, dim=-1)
                 next_token = torch.multinomial(probs, num_samples=1)
-                
+
             generate_tokens = torch.cat([generate_tokens, next_token], dim=-1)
 
             if (next_token.flatten() == STOP_SPEECH_TOKEN).all():
@@ -305,7 +415,9 @@ class ChatterboxEngine:
 
         # Detect KV dtype
         kv_inputs = [i for i in llm.get_inputs() if "past_key_values" in i.name]
-        kv_dtype = np.float16 if kv_inputs and "float16" in kv_inputs[0].type else np.float32
+        kv_dtype = (
+            np.float16 if kv_inputs and "float16" in kv_inputs[0].type else np.float32
+        )
 
         # Check if LLM needs position_ids
         llm_input_names = {i.name for i in llm.get_inputs()}
@@ -313,9 +425,16 @@ class ChatterboxEngine:
 
         def rep_penalty_fn(ids, scores):
             return self._np_rep_penalty(ids, scores, repetition_penalty)
-        generate_tokens = np.array([[START_SPEECH_TOKEN]], dtype=np.int64)
 
         batch_size = 1
+        seq_len = inputs_embeds.shape[1]
+
+        generate_tokens = np.zeros((batch_size, 1 + max_tokens), dtype=np.int64)
+        generate_tokens[0, 0] = START_SPEECH_TOKEN
+        gen_idx = 1
+
+        attention_mask = np.ones((batch_size, seq_len + max_tokens), dtype=np.int64)
+
         past_key_values = {
             f"past_key_values.{layer}.{kv}": np.zeros(
                 [batch_size, num_heads, 0, head_dim], dtype=kv_dtype
@@ -325,37 +444,40 @@ class ChatterboxEngine:
         }
 
         next_token = None
+        seq_len = inputs_embeds.shape[1]
         for i in range(max_tokens):
             if i == 0:
                 cur_embeds = inputs_embeds
-                seq_len = cur_embeds.shape[1]
-                attention_mask = np.ones((batch_size, seq_len), dtype=np.int64)
             else:
                 cur_embeds = self.service.embed_single_token(
                     next_token,
                     exaggeration=exaggeration,
                 )
-                attention_mask = np.concatenate(
-                    [attention_mask, np.ones((batch_size, 1), dtype=np.int64)], axis=1
-                )
+
+            current_seq_len = seq_len + i
+            cur_attention_mask = attention_mask[:, :current_seq_len]
 
             llm_inputs = {
                 "inputs_embeds": cur_embeds,
-                "attention_mask": attention_mask,
+                "attention_mask": cur_attention_mask,
                 **past_key_values,
             }
             if needs_position_ids:
                 if i == 0:
                     pos_ids = np.arange(seq_len, dtype=np.int64)[np.newaxis, :]
                 else:
-                    pos_ids = np.array([[attention_mask.shape[1] - 1]], dtype=np.int64)
+                    pos_ids = np.array([[current_seq_len - 1]], dtype=np.int64)
                 llm_inputs["position_ids"] = pos_ids
 
             logits, *present_kvs = llm.run(None, llm_inputs)
             logits = logits[:, -1, :]
-            logits = rep_penalty_fn(generate_tokens, logits)
+
+            cur_gen_tokens = generate_tokens[:, :gen_idx]
+            logits = rep_penalty_fn(cur_gen_tokens, logits)
+
             next_token = np.argmax(logits, axis=-1, keepdims=True).astype(np.int64)
-            generate_tokens = np.concatenate([generate_tokens, next_token], axis=-1)
+            generate_tokens[:, gen_idx] = next_token[:, 0]
+            gen_idx += 1
 
             if (next_token.flatten() == STOP_SPEECH_TOKEN).all():
                 break
@@ -364,7 +486,7 @@ class ChatterboxEngine:
                 past_key_values[key] = present_kvs[j]
 
         # Strip start/stop
-        tokens = generate_tokens[:, 1:]
+        tokens = generate_tokens[:, 1:gen_idx]
         if tokens[0, -1] == STOP_SPEECH_TOKEN:
             tokens = tokens[:, :-1]
 

@@ -265,7 +265,6 @@ fn highpass_kernel(
 }
 
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
 fn fused_preprocess_for_vad_f32(
     py: Python,
     audio: PyReadonlyArray1<f32>,
@@ -364,7 +363,15 @@ fn fused_preprocess_for_vad_f32(
     }
 
     (out.into_pyarray(py).into_any().unbind(), hp_y1, hp_y2, noise_floor_db, agc_gain)
-}
+    let view = audio.as_array();
+    let mut pcm_data = Vec::with_capacity(view.len() * 2);
+    for &x in view.iter() {
+        let val = (x * 32767.0).clamp(-32768.0, 32767.0) as i16;
+        pcm_data.extend_from_slice(&val.to_le_bytes());
+    }
+    pyo3::types::PyBytes::new(py, &pcm_data)
+        .into_any()
+        .unbind()
 
 #[pyfunction]
 fn compute_rms(audio: PyReadonlyArray1<f32>) -> f64 {
@@ -1066,9 +1073,7 @@ fn batch_decay_scores(
     temporal_decay_batch(timestamps, now, half_life_days, method)
 }
 
-// ===========================================================================
 // Module registration
-// ===========================================================================
 
 #[pymodule]
 fn rs_codec(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

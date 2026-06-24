@@ -4,7 +4,27 @@ All notable changes to gfxATOM are documented in this file.
 
 ## [Unreleased] — 2026-05-13
 
+### Added — Universal KV Broker Integration
+
+- **Universal KV Broker Surface Hooks** (`atom/kv_transfer/universal_broker_adapter.py`): Integrated SGLang's Universal KV Broker as a pluggable KV connector backend via `KVConnectorFactory`. The broker enables model-agnostic compressed KV cache ownership with support for TurboQuant and RotorQuant quantization modes. Worker-side and scheduler-side connectors implement the `KVConnectorBase` and `KVConnectorSchedulerBase` interfaces respectively, with graceful fallback for unsupported KV dtypes (warn and degrade to fp16). Full observability enabled by default with metrics tracking for allocations, compressions, spills, evictions, and cache hit/miss ratios.
+
+- **KV Broker Registration with Factory** (`atom/kv_transfer/disaggregation/factory.py`): Registered the Universal Broker as `"universal_broker"` backend option alongside the default `"moriio"` backend. The broker is automatically discoverable at runtime and can be selected via `--kv-connector universal_broker` CLI flag or `kv_transfer_config["kv_connector"]` in config. Registration gracefully handles import failures for optional `sglang` and `universal_kv` dependencies.
+
+- **Broker KV Quantization Support** (`atom/kv_transfer/universal_broker_adapter.py`): Added capability guards for supported KV dtypes (fp16, bf16, fp8, int8, int4) with clear error handling for unsupported modes. The broker validates KV cache configuration on registration and logs warnings for dtype mismatches while continuing execution.
+
+- **Broker Observability Layer** (`atom/kv_transfer/universal_broker_adapter.py`): Full-observability mode enabled by default on the scheduler-side connector. Collects metrics for broker allocation requests, compression operations, spill-to-RAM events, eviction events, and cache hit/miss ratios. Metrics can be disabled via `broker_config={"enable_metrics": False}`.
+
+- **Broker Integration Tests** (`tests/test_universal_broker_adapter.py`): Added 14 regression tests covering factory registration, connector instantiation, capability guards, metrics collection, interface compliance, and factory integration. All tests pass.
+
+- **Broker Integration Documentation** (`docs/universal_kv_broker_integration.md`): Comprehensive guide covering architecture, registration, usage, supported quantization modes, observability, interface compliance, design decisions, and future work.
+
+### Design Notes
+
+**Broker is orthogonal to attention backend selection.** The broker manages where and how KV is stored (compression, quantization, spill). The attention backend (triton, wave, aiter, flashinfer, etc.) handles how to compute attention using that KV. Any combination of broker + attention backend is valid. This separation ensures the KV management system is decoupled from compute backends.
+
 ### Added — Kernel Backend Expansion (Wave 1)
+
+- **Auralis audio optimization merge resolution** (`atom/audio/chatterbox/engine.py`): Resolved PR #27 against current `main` by preserving preallocated CPU ONNX token and attention-mask buffers while keeping the Auralis audio post-processing and benchmark additions.
 
 - **Rust File Walker** (`atom_rust.find_files`): Synced the SGLang `ignore::WalkBuilder` recursive file walker into gfxATOM's existing PyO3 extension, added a Python `os.walk` fallback helper, and wired recursive Python-file discovery through it. This targets faster traversal of large Hugging Face/model cache trees while preserving hidden-file visibility and symlink traversal for snapshot layouts.
 

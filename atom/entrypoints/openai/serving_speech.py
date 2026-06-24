@@ -35,6 +35,10 @@ from atom.audio.protocol import (
     VoiceListResponse,
     VoiceUploadResponse,
 )
+from atom.audio.speech_capabilities import (
+    get_global_validator,
+    SpeechTask,
+)
 from atom.audio.utils import apply_speed_adjustment, audio_to_bytes, create_wav_header
 
 logger = logging.getLogger("atom.audio")
@@ -123,6 +127,10 @@ class SpeechServing:
             os.environ.get("SPEAKER_MAX_UPLOADED", "1000")
         )
         self._last_upload_ts = 0
+        
+        # Capability validation
+        self._validator = get_global_validator()
+        
         self._restore_uploaded_speakers()
 
     def register_engine(
@@ -187,6 +195,79 @@ class SpeechServing:
         return extra_params.get("backend") or backend
 
     # ------------------------------------------------------------------
+    #  Capability validation
+    # ------------------------------------------------------------------
+
+    def _validate_synthesis_request(
+        self,
+        model_name: str,
+        request: AudioSpeechRequest,
+    ) -> None:
+        """Validate that a synthesis request is supported.
+        
+        Args:
+            model_name: Model name to validate.
+            request: AudioSpeechRequest to validate.
+            
+        Raises:
+            HTTPException: If model doesn't support synthesis or constraints violated.
+        """
+        try:
+            # Validate model exists and supports synthesis
+            self._validator.validate_task_supported(model_name, SpeechTask.SYNTHESIS)
+            
+            # Validate text length constraints
+            self._validator.validate_text_length(model_name, request.input)
+            
+            # Validate reference audio if provided
+            if request.voice and request.voice.lower() not in ["default"]:
+                # Treat non-default voice as voice cloning request
+                self._validator.validate_ref_audio_supported(model_name)
+            
+            # Validate streaming if requested
+            if getattr(request, "stream", False):
+                self._validator.validate_streaming_supported(model_name)
+                
+        except ValueError as e:
+            # Convert validation error to HTTP exception
+            raise HTTPException(status_code=400, detail=str(e))
+
+    def _validate_recognition_request(
+        self,
+        model_name: str,
+    ) -> None:
+        """Validate that a recognition request is supported.
+        
+        Args:
+            model_name: Model name to validate.
+            
+        Raises:
+            HTTPException: If model doesn't support recognition.
+        """
+        try:
+            self._validator.validate_task_supported(model_name, SpeechTask.RECOGNITION)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    def _validate_cloning_request(
+        self,
+        model_name: str,
+    ) -> None:
+        """Validate that a voice cloning request is supported.
+        
+        Args:
+            model_name: Model name to validate.
+            
+        Raises:
+            HTTPException: If model doesn't support voice cloning.
+        """
+        try:
+            self._validator.validate_task_supported(model_name, SpeechTask.CLONING)
+            self._validator.validate_ref_audio_supported(model_name)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    # ------------------------------------------------------------------
     #  Core speech generation
     # ------------------------------------------------------------------
 
@@ -199,6 +280,9 @@ class SpeechServing:
             engine,
             self._request_backend(request),
         )
+
+        # Validate model capabilities before processing
+        self._validate_synthesis_request(model_name, request)
 
         # Resolve uploaded voice to ref_audio
         self._apply_uploaded_speaker(request)

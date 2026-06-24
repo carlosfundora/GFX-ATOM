@@ -13,6 +13,12 @@ from typing import Literal
 import numpy as np
 import soundfile as sf
 
+try:
+    import rs_codec
+    _HAS_RS_CODEC = True
+except ImportError:
+    _HAS_RS_CODEC = False
+
 logger = logging.getLogger("atom.audio")
 
 
@@ -82,11 +88,10 @@ def audio_to_bytes(
     buf = io.BytesIO()
     if response_format == "pcm":
         # Raw 16-bit PCM (Optimized via Rust)
-        try:
-            import rs_codec
+        if _HAS_RS_CODEC:
             pcm_bytes = rs_codec.audio_to_pcm_bytes(audio)
             buf.write(pcm_bytes)
-        except ImportError:
+        else:
             pcm_data = (audio * 32767).clip(-32768, 32767).astype(np.int16)
             buf.write(pcm_data.tobytes())
     else:
