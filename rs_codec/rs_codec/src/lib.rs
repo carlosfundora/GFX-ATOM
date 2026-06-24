@@ -119,14 +119,16 @@ fn highpass_kernel(
 }
 
 #[pyfunction]
-fn audio_to_pcm_bytes(py: Python<'_>, audio: PyReadonlyArray1<f32>) -> PyObject {
+fn audio_to_pcm_bytes(py: Python<'_>, audio: PyReadonlyArray1<f32>) -> Py<PyAny> {
     let view = audio.as_array();
     let mut pcm_data = Vec::with_capacity(view.len() * 2);
     for &x in view.iter() {
         let val = (x * 32767.0).clamp(-32768.0, 32767.0) as i16;
         pcm_data.extend_from_slice(&val.to_le_bytes());
     }
-    pyo3::types::PyBytes::new(py, &pcm_data).into()
+    pyo3::types::PyBytes::new(py, &pcm_data)
+        .into_any()
+        .unbind()
 }
 
 #[pyclass]

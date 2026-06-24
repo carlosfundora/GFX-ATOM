@@ -11,6 +11,7 @@ by adding inputs_embeds support to the request pipeline.
 """
 
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Optional
@@ -25,6 +26,18 @@ try:
     _HAS_RS_CODEC = True
 except ImportError:
     _HAS_RS_CODEC = False
+
+# Native Rust synthesis (rs_chatterbox_runtime PyO3, ATOM-RS ort engine).
+# Opt-in via CHATTERBOX_RUST_ENGINE=1; any failure falls back to the Python
+# pipeline below, keeping the serving surface unchanged.
+_RUST_RUNTIME = None
+if os.getenv("CHATTERBOX_RUST_ENGINE", "0") == "1":
+    try:
+        import rs_chatterbox_runtime as _rs_chatterbox_runtime
+
+        _RUST_RUNTIME = _rs_chatterbox_runtime
+    except ImportError:
+        _RUST_RUNTIME = None
 
 from atom.audio.chatterbox.onnx_artifacts import resolve_component_path
 from atom.audio.chatterbox.service import (
@@ -155,6 +168,64 @@ class ChatterboxEngine:
         )
         self._use_gpu_backbone = False
 
+    def _try_rust_generate(
+        self,
+        text: str,
+        ref_audio_path: Optional[str],
+        exaggeration: float,
+        repetition_penalty: float,
+        temperature: float,
+    ) -> Optional[tuple[np.ndarray, dict]]:
+        """Native Rust synthesis via rs_chatterbox_runtime (opt-in).
+
+        Returns None when the Rust path is disabled or fails, so the Python
+        pipeline keeps full control of the serving contract.
+        """
+        if _RUST_RUNTIME is None:
+            return None
+        try:
+            runtime = getattr(self, "_rust_runtime_instance", None)
+            if runtime is None:
+                manifest = os.getenv(
+                    "CHATTERBOX_RUNTIME_MANIFEST",
+                    "/home/local/ai/projects/DEMERZEL/config/chatterbox-runtime.json",
+                )
+                runtime = _RUST_RUNTIME.ChatterboxRuntime(manifest)
+                self._rust_runtime_instance = runtime
+
+            # Variant routing mirrors RuntimeRequest::new: "en" -> turbo.
+            language = "en" if self.variant == "turbo" else "multilingual"
+            request = _RUST_RUNTIME.build_runtime_request(
+                text,
+                "default",
+                language,
+                ref_audio_path,
+                exaggeration,
+                0.5,
+                temperature,
+                repetition_penalty,
+            )
+            t0 = time.time()
+            response = runtime.synthesize(request)
+            pcm = np.frombuffer(response.audio_pcm16, dtype=np.int16)
+            wav = pcm.astype(np.float32) / 32768.0
+            metrics = {
+                "engine": "rust-ort",
+                "sample_rate": response.sample_rate,
+                "first_token_ms": response.first_token_ms,
+                "generate_ms": response.generate_ms,
+                "total_s": time.time() - t0,
+            }
+            logger.info(
+                "Chatterbox rust-ort synthesis: %.2fs audio (gen %.0fms)",
+                len(wav) / float(response.sample_rate),
+                response.generate_ms,
+            )
+            return wav, metrics
+        except Exception as exc:  # noqa: BLE001 — any failure falls back
+            logger.warning("Rust chatterbox path failed (%s); using Python pipeline", exc)
+            return None
+
     @torch.inference_mode()
     def generate(
         self,
@@ -175,6 +246,16 @@ class ChatterboxEngine:
         if seed is not None:
             torch.manual_seed(seed)
             np.random.seed(seed)
+
+        rust_result = self._try_rust_generate(
+            text=text,
+            ref_audio_path=ref_audio_path,
+            exaggeration=exaggeration,
+            repetition_penalty=repetition_penalty,
+            temperature=temperature,
+        )
+        if rust_result is not None:
+            return rust_result
 
         metrics = {}
 
